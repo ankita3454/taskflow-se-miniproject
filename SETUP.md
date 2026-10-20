@@ -148,3 +148,46 @@ This preserves the database volume.
 - Containerise the frontend/backend.
 - Add GitHub Actions checks and the Jenkins pipeline skeleton.
 - Complete the remaining agreed pipeline configuration.
+
+## Run the full application with Docker
+
+Prerequisites:
+- Docker Desktop is running.
+- Create the root `.env` from `.env.example` and configure your local PostgreSQL credentials.
+- Stop locally running frontend/backend development servers to free ports 5173 and 5000.
+
+From the repository root:
+
+```powershell
+docker compose up -d --build
+docker compose ps
+```
+
+Open http://localhost:5173 and click “Check backend connection”.
+
+Health endpoint through the frontend:
+http://localhost:5173/api/v1/health
+
+Check database connectivity:
+
+```powershell
+docker compose exec backend npm run db:check
+```
+
+Stop the services without deleting database data:
+
+```powershell
+docker compose stop
+```
+
+After changing application code, rebuild with:
+
+```powershell
+docker compose up -d --build
+```
+
+The database uses the named `postgres_data` volume.
+Do not run `docker compose down -v` unless intentionally deleting local database data.
+
+Current Docker Node runtime: 24.7.0.
+Alignment with the submitted SRS Node 20 runtime remains pending.

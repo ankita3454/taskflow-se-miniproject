@@ -191,3 +191,15 @@ Do not run `docker compose down -v` unless intentionally deleting local database
 
 Current Docker Node runtime: 24.7.0.
 Alignment with the submitted SRS Node 20 runtime remains pending.
+
+## Jenkins pipeline skeleton
+
+The root Jenkinsfile defines frontend lint/build, backend syntax and
+Prisma checks, and Docker image builds.
+
+It requires a Linux Jenkins agent with Git, compatible Node.js/npm,
+and access to Docker.
+
+The pipeline has not yet been executed on a Jenkins server.
+Automated feature tests, coverage, SonarQube integration, and deployment
+remain to be implemented. Node runtime alignment with the SRS is pending.

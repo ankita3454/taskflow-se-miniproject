@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api, ApiError } from "../lib/api.js";
 
-export default function LoginForm({ onLoggedIn, onSwitchToRegister }) {
+export default function LoginForm({ notice, onLoggedIn, onSwitchToRegister }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -27,6 +27,12 @@ export default function LoginForm({ onLoggedIn, onSwitchToRegister }) {
   return (
     <form onSubmit={handleSubmit} className="auth-form">
       <h2>Log in to TaskFlow</h2>
+
+      {notice && (
+        <p role="status" className="form-status">
+          {notice}
+        </p>
+      )}
 
       <label htmlFor="login-email">Email</label>
       <input

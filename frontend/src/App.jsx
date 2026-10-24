@@ -5,6 +5,7 @@ import RegisterForm from "./components/RegisterForm.jsx";
 import ProfileView from "./components/ProfileView.jsx";
 
 const TOKEN_STORAGE_KEY = "taskflow.token";
+const SESSION_EXPIRED_NOTICE = "Your session has expired. Please log in again.";
 
 export default function App() {
   // Token saved from a previous visit, read once on first render.
@@ -15,6 +16,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authView, setAuthView] = useState("login"); // "login" | "register"
   const [restoringSession, setRestoringSession] = useState(Boolean(storedToken));
+  const [notice, setNotice] = useState("");
 
   // On load, if a token was saved from a previous session, verify it's
   // still valid and fetch the profile it belongs to (F1-REQ-06).
@@ -28,11 +30,12 @@ export default function App() {
       .then(({ user: fetchedUser }) => {
         if (!cancelled) setUser(fetchedUser);
       })
-      .catch(() => {
+      .catch((err) => {
         // Expired/invalid token (F1-REQ-08) — drop it and show the login form.
         if (!cancelled) {
           localStorage.removeItem(TOKEN_STORAGE_KEY);
           setToken(null);
+          if (err?.status === 401) setNotice(SESSION_EXPIRED_NOTICE);
         }
       })
       .finally(() => {
@@ -45,6 +48,7 @@ export default function App() {
   }, [storedToken]);
 
   function handleAuthenticated(newToken, newUser) {
+    setNotice("");
     localStorage.setItem(TOKEN_STORAGE_KEY, newToken);
     setToken(newToken);
     setUser(newUser);
@@ -55,6 +59,13 @@ export default function App() {
     setToken(null);
     setUser(null);
     setAuthView("login");
+  }
+
+  // A protected request came back 401 (expired or invalid JWT): end the
+  // session and send the user back to the login form (issue #2).
+  function handleSessionExpired() {
+    handleLogout();
+    setNotice(SESSION_EXPIRED_NOTICE);
   }
 
   if (restoringSession) {
@@ -76,9 +87,11 @@ export default function App() {
           user={user}
           onUserUpdated={setUser}
           onLogout={handleLogout}
+          onSessionExpired={handleSessionExpired}
         />
       ) : authView === "login" ? (
         <LoginForm
+          notice={notice}
           onLoggedIn={handleAuthenticated}
           onSwitchToRegister={() => setAuthView("register")}
         />

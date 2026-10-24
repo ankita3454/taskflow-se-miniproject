@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { api, ApiError } from "../lib/api.js";
 
-export default function ProfileView({ token, user, onUserUpdated, onLogout }) {
+export default function ProfileView({
+  token,
+  user,
+  onUserUpdated,
+  onLogout,
+  onSessionExpired,
+}) {
   const [name, setName] = useState(user.name);
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("");
@@ -24,6 +30,10 @@ export default function ProfileView({ token, user, onUserUpdated, onLogout }) {
       setPassword("");
       setStatus("Profile updated.");
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        onSessionExpired();
+        return;
+      }
       setError(err instanceof ApiError ? err.message : "Update failed.");
     } finally {
       setSaving(false);

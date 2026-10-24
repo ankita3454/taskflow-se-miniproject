@@ -7,6 +7,7 @@ import {
   updateOwnProfile,
   AuthError,
 } from "../services/authService.js";
+import { ValidationError } from "../utils/validation.js";
 
 const router = Router();
 
@@ -15,6 +16,11 @@ function handle(fn) {
     try {
       await fn(req, res);
     } catch (error) {
+      if (error instanceof ValidationError) {
+        return res.status(400).json({
+          error: { code: "VALIDATION_ERROR", message: error.message, fields: error.details },
+        });
+      }
       if (error instanceof AuthError) {
         return res.status(error.status).json({ error: { code: error.code, message: error.message } });
       }
@@ -30,7 +36,7 @@ function handle(fn) {
 router.post(
   "/register",
   handle(async (req, res) => {
-    const { token, user } = await registerUser(req.body || {});
+    const { token, user } = await registerUser(req.body);
     res.status(201).json({ token, user });
   }),
 );
@@ -39,7 +45,7 @@ router.post(
 router.post(
   "/login",
   handle(async (req, res) => {
-    const { token, user } = await authenticateUser(req.body || {});
+    const { token, user } = await authenticateUser(req.body);
     res.status(200).json({ token, user });
   }),
 );
@@ -71,7 +77,7 @@ router.patch(
   "/me",
   requireAuth,
   handle(async (req, res) => {
-    const user = await updateOwnProfile(req.user.id, req.body || {});
+    const user = await updateOwnProfile(req.user.id, req.body);
     res.status(200).json({ user });
   }),
 );

@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "db:check": "node scripts/check-db.js"
@@ -20,6 +20,7 @@
     "express": "^5.3.0"
   },
   "devDependencies": {
+    "jest": "^30.5.2",
     "prisma": "^6.19.3"
   }
 }

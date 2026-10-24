@@ -2,17 +2,20 @@
 
 ## Current foundation
 
-- React frontend with a backend-connection check.
-- Express backend with `/api/v1/health`.
+- React frontend with login, registration and profile pages (F1).
+- Express backend with `/api/v1/health` and JWT authentication under
+  `/api/v1/auth` (register, login, logout, view/update profile).
 - PostgreSQL 16.
 - Prisma 6 migrations for User, Project, ProjectMember and Task.
 - Database connectivity verification script.
 - Docker Compose configuration for the frontend, backend and database.
-- GitHub Actions for frontend lint/build and backend syntax/database checks.
+- GitHub Actions for frontend lint/build, backend syntax/database checks
+  and the F1 authentication tests.
 - Jenkins pipeline skeleton, not yet executed in Jenkins.
 
-Product features such as authentication and task management are tracked
-in their separate assigned issues. This guide does not confirm their completion.
+Authentication (F1) is implemented. Other product features, such as
+project and task management, are tracked in their separate assigned issues.
+This guide does not confirm their completion.
 
 ## Prerequisites
 
@@ -49,7 +52,25 @@ The PostgreSQL credentials initialise a new database volume.
 Editing `.env` later does not change an existing database password.
 
 For an existing checkout, do not overwrite `.env` files containing
-your local settings.
+your local settings. Instead, add any new variables from the matching
+`.env.example` by hand.
+
+### JWT secret (required)
+
+The backend signs login tokens with `JWT_SECRET` and refuses to start
+without it. Each teammate generates their own random value; never commit
+or share it. Generate one with either command:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+```bash
+openssl rand -hex 32
+```
+
+`JWT_EXPIRES_IN` sets how long a login lasts (default `2h`). Setting it to
+something short such as `1m` is a quick way to test session expiry.
 
 ## Option A — Full Docker mode
 
@@ -61,8 +82,14 @@ From the repository root, for a new checkout:
 Copy-Item .env.example .env
 ```
 
-Edit the root `.env` and replace the password placeholder with your
-chosen local password.
+Edit the root `.env`:
+
+- Replace the password placeholder with your chosen local password.
+- Replace the `JWT_SECRET` placeholder with a generated value
+  (see "JWT secret" above).
+
+If `JWT_SECRET` is missing, `docker compose up` stops with
+"Set JWT_SECRET in the root .env".
 
 The Compose configuration reads these root environment values.
 Backend and frontend `.env` files are not required for full Docker mode.
@@ -84,13 +111,10 @@ before starting its server.
 
 ### 3. Verify
 
-Open http://localhost:5173 and click "Check backend connection".
-
-Expected message:
-
-```text
-Connected: TaskFlow API
-```
+Open http://localhost:5173. The TaskFlow login page should appear.
+Click "Register", create an account, and check that you land on your
+profile page. That confirms the frontend, backend, database and JWT
+setup are all working.
 
 Health endpoint through the frontend:
 
@@ -148,6 +172,9 @@ as the root `.env`. With the example username and database name:
 ```text
 DATABASE_URL="postgresql://taskflow:YOUR_LOCAL_PASSWORD@localhost:55432/taskflow_dev?schema=public"
 ```
+
+Also in `backend/.env`, replace the `JWT_SECRET` placeholder with a
+generated value (see "JWT secret" above).
 
 The frontend example uses:
 
@@ -214,7 +241,8 @@ npm ci
 npm run dev -- --port 5173 --strictPort
 ```
 
-Open http://localhost:5173 and click "Check backend connection".
+Open http://localhost:5173. The TaskFlow login page should appear.
+Register an account and check that you land on your profile page.
 
 ### 6. Run the available checks
 
@@ -229,10 +257,13 @@ From `backend`:
 
 ```powershell
 npm run db:check
+npm test
 ```
 
-The backend `npm test` script is currently a failing placeholder.
-An automated feature test suite has not yet been configured.
+`npm test` runs the F1 authentication tests (`backend/tests/`) against
+the database in `backend/.env`, so PostgreSQL must be running with
+migrations applied. Each run uses its own test e-mail addresses and
+deletes only the users it created.
 
 ### 7. Stop local services
 
@@ -287,8 +318,9 @@ The workflow runs on pushes and pull requests. It checks:
 - Prisma schema validation and client generation.
 - Migration application and database connectivity using a temporary
   PostgreSQL database.
+- The F1 authentication tests (`npm test`) against that database.
 
-These are foundation checks, not complete product-feature tests.
+Feature tests currently cover F1 (authentication) only.
 The workflow does not currently build Docker images or execute Jenkins.
 
 ## Jenkins pipeline skeleton
@@ -312,8 +344,9 @@ Its dummy database URL is used for Prisma generation, not database testing.
 - Verify a fresh clone on another teammate's computer.
 - Align and verify the project runtime against the submitted SRS.
 - Connect and execute the Jenkins pipeline on a configured Jenkins agent.
-- Implement automated feature tests, coverage, SonarQube integration
-  and test-environment deployment as required by the project plan.
+- Extend automated tests to the remaining features, and add coverage,
+  SonarQube integration and test-environment deployment as required by
+  the project plan.
 
 The initial setup issue remains In Progress until its agreed
 acceptance criteria are satisfied.

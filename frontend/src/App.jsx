@@ -4,6 +4,7 @@ import { api } from "./lib/api.js";
 import LoginForm from "./components/LoginForm.jsx";
 import RegisterForm from "./components/RegisterForm.jsx";
 import ProfileView from "./components/ProfileView.jsx";
+import NotificationBell from "./components/NotificationBell.jsx";
 
 const TOKEN_STORAGE_KEY = "taskflow.token";
 const SESSION_EXPIRED_NOTICE = "Your session has expired. Please log in again.";
@@ -83,6 +84,12 @@ export default function App() {
       <h1>TaskFlow</h1>
 
       {token && user ? (
+      <>
+        <NotificationBell
+        key={user.id}
+        token={token}
+        onSessionExpired={handleSessionExpired}
+      />
         <ProfileView
           token={token}
           user={user}
@@ -90,6 +97,7 @@ export default function App() {
           onLogout={handleLogout}
           onSessionExpired={handleSessionExpired}
         />
+      </>
       ) : authView === "login" ? (
         <LoginForm
           notice={notice}

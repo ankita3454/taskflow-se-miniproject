@@ -48,3 +48,58 @@ export async function findProjectMembership(
     },
   });
 }
+
+// List only the signed-in user's notifications, newest first.
+export async function listUserNotifications(userId, db = prisma) {
+  return db.notification.findMany({
+    where: { userId },
+    orderBy: [
+      { createdAt: "desc" },
+      { id: "desc" },
+    ],
+  });
+}
+
+// Count only this user's unread notifications.
+export async function countUnreadNotifications(userId, db = prisma) {
+  return db.notification.count({
+    where: {
+      userId,
+      isRead: false,
+    },
+  });
+}
+
+// Scope the update to the recipient so users cannot change
+// another user's notification, even if they know its ID.
+export async function markUserNotificationRead(
+  notificationId,
+  userId,
+  db = prisma,
+) {
+  return db.notification.updateMany({
+    where: {
+      id: notificationId,
+      userId,
+    },
+    data: {
+      isRead: true,
+    },
+  });
+}
+
+// Mark only this user's unread notifications as read.
+export async function markAllUserNotificationsRead(
+  userId,
+  db = prisma,
+) {
+  return db.notification.updateMany({
+    where: {
+      userId,
+      isRead: false,
+    },
+    data: {
+      isRead: true,
+    },
+  });
+}

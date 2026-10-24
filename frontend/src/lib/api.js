@@ -44,6 +44,24 @@ export const api = {
   me: (token) => request("/auth/me", { token }),
   updateMe: (token, fields) =>
     request("/auth/me", { method: "PATCH", body: fields, token }),
+
+    listNotifications: (token) =>
+    request("/notifications", { token }),
+
+  getUnreadNotificationCount: (token) =>
+    request("/notifications/unread-count", { token }),
+
+  markNotificationRead: (token, notificationId) =>
+    request(
+      `/notifications/${encodeURIComponent(notificationId)}/read`,
+      { method: "PATCH", token },
+    ),
+
+  markAllNotificationsRead: (token) =>
+    request("/notifications/read-all", {
+      method: "PATCH",
+      token,
+    }),
 };
 
 export { ApiError };

@@ -126,8 +126,9 @@ before(async () => {
   await new Promise((resolve) => server.once("listening", resolve));
   base = `http://127.0.0.1:${server.address().port}`;
 
-  // Project A: "owner" created it. "coowner" has project role Owner.
-  // "member" and "assignee" are ordinary members.
+  // Project A: "owner" created it (Project.ownerId), so is its only Owner.
+  // "coowner" is a member whose membership row is marked "Owner"; that must
+  // NOT grant Owner rights. "member" and "assignee" are ordinary members.
   // "systemOwner" has system role OWNER but no part in project A.
   // "admin" has system role ADMIN but no part in project A.
   await makeUser("owner");
@@ -287,16 +288,33 @@ describe("Project-owner actions (SRS 6.5, F4-REQ-07, TC-05, TC-16)", () => {
     assert.equal(await membership(users.newcomer.id), null);
   });
 
-  test("a member whose project role is Owner has Owner rights in that project", async () => {
-    const response = await call(`/projects/${projectA.id}/members`, {
-      method: "POST",
-      body: { userId: users.newcomer.id },
-      as: "coowner",
-    });
-    assert.equal(response.status, 200);
-    await prisma.projectMember.delete({
-      where: { projectId_userId: { projectId: projectA.id, userId: users.newcomer.id } },
-    });
+  test("single Owner: a membership marked \"Owner\" does not grant Owner rights", async () => {
+    expectForbidden(
+      await call(`/projects/${projectA.id}/members`, {
+        method: "POST",
+        body: { userId: users.newcomer.id },
+        as: "coowner",
+      }),
+      "invite",
+    );
+    assert.equal(await membership(users.newcomer.id), null, "nobody was added");
+    expectForbidden(
+      await call(`/projects/${projectA.id}/archive`, { method: "POST", as: "coowner" }),
+      "archive",
+    );
+    expectForbidden(
+      await call(`/tasks/${task.id}/assignee`, {
+        method: "PATCH",
+        body: { assigneeId: users.coowner.id },
+        as: "coowner",
+      }),
+      "assign",
+    );
+    const project = await prisma.project.findUnique({ where: { id: projectA.id } });
+    assert.equal(project.archived, false);
+    assert.equal((await currentTask()).assigneeId, users.assignee.id);
+    // Still an ordinary member: can view the project.
+    assert.equal((await call(`/projects/${projectA.id}`, { as: "coowner" })).status, 200);
   });
 
   test("a system role of Owner or Admin does not grant rights in someone else's project", async () => {
@@ -374,6 +392,29 @@ describe("Task permissions (SRS 6.5)", () => {
     });
     assert.equal(response.status, 200);
     assert.equal((await currentTask()).status, "IN_PROGRESS");
+  });
+
+  test("an assignee removed from the project can no longer change the task's status", async () => {
+    const leftover = await prisma.task.create({
+      data: { projectId: projectA.id, title: "Leftover assignment", priority: "LOW", assigneeId: users.newcomer.id },
+    });
+    await prisma.projectMember.create({ data: { projectId: projectA.id, userId: users.newcomer.id } });
+    const whileMember = await call(`/tasks/${leftover.id}/status`, {
+      method: "PATCH",
+      body: { status: "IN_PROGRESS" },
+      as: "newcomer",
+    });
+    assert.equal(whileMember.status, 200, "allowed while still a member");
+
+    await prisma.projectMember.delete({
+      where: { projectId_userId: { projectId: projectA.id, userId: users.newcomer.id } },
+    });
+    expectForbidden(
+      await call(`/tasks/${leftover.id}/status`, { method: "PATCH", body: { status: "DONE" }, as: "newcomer" }),
+    );
+    const after = await prisma.task.findUnique({ where: { id: leftover.id } });
+    assert.equal(after.status, "IN_PROGRESS", "status unchanged");
+    assert.equal(after.assigneeId, users.newcomer.id, "still assigned, but no longer allowed");
   });
 
   test("the project Owner can change the status", async () => {

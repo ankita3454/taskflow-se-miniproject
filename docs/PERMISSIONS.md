@@ -8,9 +8,10 @@ F8-REQ-02/05 and SEC-02. Implemented for issue #3.
 **System role** (`User.role`): every user has exactly one of `MEMBER`
 (the default), `OWNER` or `ADMIN`. Only an Administrator can change it.
 
-**Project role** (`ProjectMember.projectRole`): `"Owner"` or `"Member"`,
-held separately in each project. A user is the **Owner of a project** if
-they created it (`Project.ownerId`) or their project role in it is `"Owner"`.
+**Project Owner**: each project has exactly one Owner, the user in
+`Project.ownerId` (the creator, F4-REQ-01). Everyone else in
+`ProjectMember` is a member. `ProjectMember.projectRole` never grants Owner
+rights, even if it says `"Owner"`.
 
 A system role never grants rights inside a project. A user whose system
 role is `OWNER` or `ADMIN` has no access to a project they aren't part of.
@@ -25,7 +26,7 @@ role is `OWNER` or `ADMIN` has no access to a project they aren't part of.
 | Archive a project | That project's Owner | `requireProjectOwner()` | 403 |
 | View a task | Members of the task's project | `requireTaskMember()` | 403 |
 | Assign or reassign a task | The Owner of the task's project | `requireTaskProjectOwner()` | 403 |
-| Change a task's status | The task's assignee, or the Owner of its project | `requireTaskStatusChange()` | 403 |
+| Change a task's status | The task's assignee (while still a project member), or the Owner of its project | `requireTaskStatusChange()` | 403 |
 | Deactivate/reactivate a user, change a system role, user management, audit log | Administrators | `requireRole("ADMIN")` | 403 |
 
 An unknown or malformed project/task ID returns 404. A rejected request
@@ -68,7 +69,8 @@ router.post("/admin/users/:id/deactivate", requireAuth, requireRole("ADMIN"), de
 ## Tests
 
 `backend/tests/permissions.test.js` covers TC-05, TC-16, cross-project
-access, task-status and assignment permissions, Admin-only actions, and
+access, the single-Owner rule, task-status and assignment permissions
+(including assignees removed from the project), Admin-only actions, and
 immediate role changes and deactivation. Run with `npm test`; CI runs it on
 every push.
 

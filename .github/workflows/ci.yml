@@ -96,3 +96,8 @@ jobs:
 
       - name: Check database connection
         run: npm run db:check
+
+      - name: Run F1 authentication tests
+        run: npm test
+        env:
+          JWT_SECRET: ci_only_jwt_secret

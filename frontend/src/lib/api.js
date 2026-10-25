@@ -2,10 +2,11 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api/v1";
 
 class ApiError extends Error {
-  constructor(status, code, message) {
+  constructor(status, code, message, fields = {}) {
     super(message);
     this.status = status;
     this.code = code;
+    this.fields = fields;
   }
 }
 
@@ -29,6 +30,7 @@ async function request(path, { method = "GET", body, token } = {}) {
       response.status,
       err.code || "UNKNOWN",
       err.message || "Something went wrong. Please try again.",
+      err.fields || {},
     );
   }
 
@@ -44,6 +46,15 @@ export const api = {
   me: (token) => request("/auth/me", { token }),
   updateMe: (token, fields) =>
     request("/auth/me", { method: "PATCH", body: fields, token }),
+
+  projects: (token) => request("/projects", { token }),
+
+  projectTasks: (projectId, token) =>
+    request(`/projects/${encodeURIComponent(projectId)}/tasks`, { token }),
+
+  createTask: (fields, token) =>
+    request("/tasks", { method: "POST", body: fields, token }),
+
 };
 
 export { ApiError };

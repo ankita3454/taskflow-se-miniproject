@@ -320,3 +320,39 @@
     cursor: not-allowed;
   }
 }
+
+
+.task-workspace {
+  margin: 2rem auto;
+  max-width: 720px;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.task-workspace label {
+  display: block;
+  margin-top: 0.75rem;
+  margin-bottom: 0.3rem;
+}
+
+.task-workspace input,
+.task-workspace textarea,
+.task-workspace select {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+
+.task-workspace button {
+  margin-top: 1rem;
+}
+
+.task-list {
+  padding-left: 1.25rem;
+}
+
+.task-list li {
+  margin: 1rem 0;
+  overflow-wrap: anywhere;
+}

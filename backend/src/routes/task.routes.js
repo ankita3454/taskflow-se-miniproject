@@ -1,8 +1,13 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth.js";
-import { requireProjectMember } from "../middleware/permissions.js";
 import {
+  requireProjectMember,
+  requireTaskProjectOwner,
+} from "../middleware/permissions.js";
+import {
+  assignTask,
   createTask,
+  listProjectMembers,
   listProjectTasks,
   listAccessibleProjects,
   TaskError,
@@ -72,6 +77,26 @@ router.get(
   handle(async (req, res) => {
     const tasks = await listProjectTasks(req.project.id);
     res.status(200).json({ tasks });
+  }),
+);
+
+router.get(
+  "/projects/:projectId/members",
+  requireAuth,
+  requireProjectMember(),
+  handle(async (req, res) => {
+    const members = await listProjectMembers(req.project.id);
+    res.status(200).json({ members });
+  }),
+);
+
+router.patch(
+  "/tasks/:taskId/assignee",
+  requireAuth,
+  requireTaskProjectOwner(),
+  handle(async (req, res) => {
+    const task = await assignTask({ taskId: req.task.id, body: req.body });
+    res.status(200).json({ task });
   }),
 );
 

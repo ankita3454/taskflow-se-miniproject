@@ -1,4 +1,6 @@
 import prisma from "../repositories/prisma.js";
+import { isUuid } from "./permissionService.js";
+import notificationService from "./notification.service.js";
 
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
 const MAX_TITLE_LENGTH = 200;
@@ -200,6 +202,87 @@ export async function listProjectTasks(projectId) {
     include: {
       assignee: { select: { id: true, name: true, email: true } },
     },
+  });
+}
+
+export async function listProjectMembers(projectId) {
+  return prisma.projectMember.findMany({
+    where: { projectId, user: { active: true } },
+    orderBy: { user: { name: "asc" } },
+    select: {
+      projectRole: true,
+      user: { select: { id: true, name: true, email: true } },
+    },
+  });
+}
+
+export async function assignTask({ taskId, body }) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    invalid("Request body must be a JSON object");
+  }
+
+  const unknown = Object.keys(body).filter((key) => key !== "assigneeId");
+  if (unknown.length) {
+    invalid("Request contains unsupported fields", {
+      unknown: `Unsupported field(s): ${unknown.join(", ")}`,
+    });
+  }
+
+  const assigneeId = body.assigneeId;
+  if (!isUuid(assigneeId)) {
+    invalid("A valid assignee ID is required", {
+      assigneeId: "Assignee ID must be a valid UUID",
+    });
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const task = await tx.task.findUnique({
+      where: { id: taskId },
+      select: {
+        id: true,
+        projectId: true,
+        assigneeId: true,
+      },
+    });
+    if (!task) {
+      throw new TaskError(404, "NOT_FOUND", "Task not found");
+    }
+
+    const assignee = await tx.user.findUnique({
+      where: { id: assigneeId },
+      select: { id: true, active: true },
+    });
+    const membership = await tx.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId: task.projectId,
+          userId: assigneeId,
+        },
+      },
+      select: { userId: true },
+    });
+
+    if (!assignee || !assignee.active || !membership) {
+      invalid("Assignee must be an active member of this project", {
+        assigneeId: "Assignee must be an active member of this project",
+      });
+    }
+
+    if (task.assigneeId === assigneeId) {
+      return tx.task.findUnique({
+        where: { id: taskId },
+        include: { assignee: { select: { id: true, name: true, email: true } } },
+      });
+    }
+
+    const updated = await tx.task.update({
+      where: { id: taskId },
+      data: { assigneeId },
+      include: { assignee: { select: { id: true, name: true, email: true } } },
+    });
+
+    await notificationService.notifyTaskAssigned(taskId, tx);
+    return updated;
   });
 }
 

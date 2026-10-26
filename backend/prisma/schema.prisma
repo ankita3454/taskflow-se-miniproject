@@ -21,8 +21,9 @@ model User {
   role         UserRole @default(MEMBER)
   active       Boolean  @default(true)
 
-  ownedProjects Project[]       @relation("ProjectOwner")
-  memberships   ProjectMember[]
+  ownedProjects   Project[]            @relation("ProjectOwner")
+  memberships     ProjectMember[]
+  sentInvitations ProjectInvitation[]  @relation("ProjectInvitationSender")
 
   assignedTasks Task[] @relation("TaskAssignee")
 
@@ -35,9 +36,10 @@ model Project {
   ownerId  String  @map("owner_id") @db.Uuid
   archived Boolean @default(false)
 
-  owner   User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  members ProjectMember[]
-  tasks   Task[]
+  owner       User                @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members     ProjectMember[]
+  invitations ProjectInvitation[]
+  tasks       Task[]
 
   @@unique([ownerId, name])
   @@map("projects")
@@ -53,6 +55,29 @@ model ProjectMember {
 
   @@id([projectId, userId])
   @@map("project_members")
+}
+
+enum InvitationStatus {
+  PENDING  @map("Pending")
+  ACCEPTED @map("Accepted")
+  DECLINED @map("Declined")
+}
+
+model ProjectInvitation {
+  id           String           @id @default(uuid()) @map("invitation_id") @db.Uuid
+  projectId    String           @map("project_id") @db.Uuid
+  invitedEmail String           @map("invited_email") @db.VarChar(150)
+  invitedById  String           @map("invited_by") @db.Uuid
+  status       InvitationStatus @default(PENDING)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  respondedAt  DateTime?        @map("responded_at") @db.Timestamptz(3)
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  invitedBy User    @relation("ProjectInvitationSender", fields: [invitedById], references: [id], onDelete: Restrict)
+
+  @@index([invitedEmail, status])
+  @@index([projectId, status])
+  @@map("project_invitations")
 }
 
 enum TaskPriority {

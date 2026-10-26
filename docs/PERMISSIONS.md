@@ -23,6 +23,7 @@ role is `OWNER` or `ADMIN` has no access to a project they aren't part of.
 | Any protected endpoint | A logged-in, active user | `requireAuth` | 401 |
 | View a project, create tasks in it | Members of that project (incl. its Owner) | `requireProjectMember()` | 403 |
 | Invite, remove or change a member's project role | That project's Owner | `requireProjectOwner()` | 403 |
+| Accept or decline a project invitation | The user whose e-mail matches the invitation | Invitation service ownership check | 403 |
 | Archive a project | That project's Owner | `requireProjectOwner()` | 403 |
 | View a task | Members of the task's project | `requireTaskMember()` | 403 |
 | Assign or reassign a task | The Owner of the task's project | `requireTaskProjectOwner()` | 403 |
@@ -73,6 +74,10 @@ access, the single-Owner rule, task-status and assignment permissions
 (including assignees removed from the project), Admin-only actions, and
 immediate role changes and deactivation. Run with `npm test`; CI runs it on
 every push.
+
+`backend/tests/invitations.test.js` covers Owner-only invitation creation,
+invitee inbox visibility, invitation response ownership, acceptance with
+Member membership, and declining without membership.
 
 ## Not covered here
 

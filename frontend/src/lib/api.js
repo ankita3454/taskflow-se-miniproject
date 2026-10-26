@@ -44,6 +44,9 @@ export const api = {
   me: (token) => request("/auth/me", { token }),
   updateMe: (token, fields) =>
     request("/auth/me", { method: "PATCH", body: fields, token }),
+  projects: (token) => request("/projects", { token }),
+  createProject: (token, name) =>
+    request("/projects", { method: "POST", body: { name }, token }),
 };
 
 export { ApiError };

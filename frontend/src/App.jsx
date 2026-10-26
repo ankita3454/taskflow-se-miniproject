@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import { api } from "./lib/api.js";
 import LoginForm from "./components/LoginForm.jsx";
@@ -55,19 +55,19 @@ export default function App() {
     setUser(newUser);
   }
 
-  function handleLogout() {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     setToken(null);
     setUser(null);
     setAuthView("login");
-  }
+  }, []);
 
   // A protected request came back 401 (expired or invalid JWT): end the
   // session and send the user back to the login form (issue #2).
-  function handleSessionExpired() {
+  const handleSessionExpired = useCallback(() => {
     handleLogout();
     setNotice(SESSION_EXPIRED_NOTICE);
-  }
+  }, [handleLogout]);
 
   if (restoringSession) {
     return (

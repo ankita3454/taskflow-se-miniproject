@@ -86,7 +86,7 @@ describe("project invitations (F4-REQ-02/03/04/07)", () => {
   test("an Owner creates a persisted invitation visible in the invitee inbox", async () => {
     const response = await invite(` ${users.inbox.email.toUpperCase()} `);
     assert.equal(response.status, 201);
-    assert.equal(response.body.invitation.invitedEmail, users.invitee.email);
+    assert.equal(response.body.invitation.invitedEmail, users.inbox.email);
     assert.equal(response.body.invitation.status, "PENDING");
 
     const stored = await prisma.projectInvitation.findUnique({

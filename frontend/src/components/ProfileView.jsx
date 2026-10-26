@@ -95,7 +95,7 @@ export default function ProfileView({
         </button>
       </form>
 
-      <ProjectPanel token={token} onSessionExpired={onSessionExpired} />
+      <ProjectPanel token={token} userId={user.id} onSessionExpired={onSessionExpired} />
 
       <button
         type="button"

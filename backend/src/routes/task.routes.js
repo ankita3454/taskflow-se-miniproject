@@ -1,10 +1,14 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth.js";
-import { requireProjectMember } from "../middleware/permissions.js";
+import {
+  requireProjectMember,
+  requireTaskProjectOwner,
+} from "../middleware/permissions.js";
 import {
   createTask,
   listProjectTasks,
   listAccessibleProjects,
+  updateTask,
   TaskError,
 } from "../services/taskService.js";
 
@@ -73,6 +77,25 @@ router.get(
   handle(async (req, res) => {
     const tasks = await listProjectTasks(req.project.id);
     res.status(200).json({ tasks });
+  }),
+);
+
+/**
+ * PATCH /api/v1/tasks/:taskId
+ * Only the Project Owner can edit task details.
+ * Completed tasks cannot be edited.
+ */
+router.patch(
+  "/tasks/:taskId",
+  requireAuth,
+  requireTaskProjectOwner(),
+  handle(async (req, res) => {
+    const task = await updateTask({
+      taskId: req.task.id,
+      body: req.body,
+    });
+
+    res.status(200).json({ task });
   }),
 );
 

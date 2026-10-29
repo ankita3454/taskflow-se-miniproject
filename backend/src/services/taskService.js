@@ -391,3 +391,169 @@ export async function listAccessibleProjects(userId) {
     orderBy: { name: "asc" },
   });
 }
+
+const EDITABLE_TASK_FIELDS = [
+  "title",
+  "description",
+  "priority",
+  "dueDate",
+  "timeEstimate",
+];
+
+/**
+ * Update task details.
+ * The route must authenticate the user and enforce Project Owner access.
+ * A completed task cannot be edited.
+ */
+export async function updateTask({ taskId, body }) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    invalid("Request body must be a JSON object");
+  }
+
+  const keys = Object.keys(body);
+
+  if (keys.length === 0) {
+    invalid("At least one field must be provided");
+  }
+
+  const unknown = keys.filter((key) => !EDITABLE_TASK_FIELDS.includes(key));
+
+  if (unknown.length > 0) {
+    invalid("Request contains unsupported fields", {
+      unknown: `Unsupported field(s): ${unknown.join(", ")}`,
+    });
+  }
+
+  const data = {};
+
+  if (Object.hasOwn(body, "title")) {
+    if (typeof body.title !== "string" || !body.title.trim()) {
+      invalid("Title is required", { title: "Title is required" });
+    }
+
+    data.title = body.title.trim();
+
+    if (data.title.length > MAX_TITLE_LENGTH) {
+      invalid(`Title must be at most ${MAX_TITLE_LENGTH} characters`, {
+        title: `Title must be at most ${MAX_TITLE_LENGTH} characters`,
+      });
+    }
+  }
+
+  if (Object.hasOwn(body, "description")) {
+    if (body.description !== null && typeof body.description !== "string") {
+      invalid("Description must be text", {
+        description: "Description must be text or null",
+      });
+    }
+
+    data.description = body.description === null
+      ? null
+      : body.description.trim();
+
+    if (data.description?.length > MAX_DESCRIPTION_LENGTH) {
+      invalid(
+        `Description must be at most ${MAX_DESCRIPTION_LENGTH} characters`,
+        {
+          description: `Description must be at most ${MAX_DESCRIPTION_LENGTH} characters`,
+        },
+      );
+    }
+  }
+
+  if (Object.hasOwn(body, "priority")) {
+    if (!PRIORITIES.includes(body.priority)) {
+      invalid("A valid priority is required", {
+        priority: `Priority must be one of: ${PRIORITIES.join(", ")}`,
+      });
+    }
+
+    data.priority = body.priority;
+  }
+
+  if (Object.hasOwn(body, "dueDate")) {
+    const value = body.dueDate;
+
+    if (value === null || value === "") {
+      data.dueDate = null;
+    } else {
+      if (!isValidDateOnly(value)) {
+        invalid("Due date must be a valid date in YYYY-MM-DD format", {
+          dueDate: "Use a valid date in YYYY-MM-DD format, or null to clear it",
+        });
+      }
+
+      data.dueDate = new Date(`${value}T00:00:00.000Z`);
+    }
+  }
+
+  if (Object.hasOwn(body, "timeEstimate")) {
+    const value = body.timeEstimate;
+
+    if (value === null || value === "") {
+      data.timeEstimate = null;
+    } else {
+      if (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        value < 0
+      ) {
+        invalid("Time estimate must be a non-negative number", {
+          timeEstimate: "Enter a non-negative number, or null to clear it",
+        });
+      }
+
+      data.timeEstimate = value;
+    }
+  }
+
+  // Check completion before updating.
+  const existing = await prisma.task.findUnique({
+    where: { id: taskId },
+    select: { id: true, status: true },
+  });
+
+  if (!existing) {
+    throw new TaskError(404, "NOT_FOUND", "Task not found");
+  }
+
+  if (existing.status === "DONE") {
+    throw new TaskError(
+      409,
+      "TASK_COMPLETED",
+      "Completed tasks cannot be edited",
+    );
+  }
+
+  // The status condition also protects against a task becoming DONE
+  // between the check above and the database update.
+  const result = await prisma.task.updateMany({
+    where: {
+      id: taskId,
+      status: { not: "DONE" },
+    },
+    data,
+  });
+
+  if (result.count === 0) {
+    const current = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { id: true, status: true },
+    });
+
+    if (!current) {
+      throw new TaskError(404, "NOT_FOUND", "Task not found");
+    }
+
+    throw new TaskError(
+      409,
+      "TASK_COMPLETED",
+      "Completed tasks cannot be edited",
+    );
+  }
+
+  return prisma.task.findUnique({
+    where: { id: taskId },
+    include: TASK_INCLUDE,
+  });
+}

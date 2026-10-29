@@ -55,6 +55,23 @@ export const api = {
   createTask: (fields, token) =>
     request("/tasks", { method: "POST", body: fields, token }),
 
+  createProject: (token, name) =>
+    request("/projects", { method: "POST", body: { name }, token }),
+
+  invitations: (token) => request("/invitations", { token }),
+
+  inviteMember: (token, projectId, email) =>
+    request(`/projects/${projectId}/invitations`, {
+      method: "POST",
+      body: { email },
+      token,
+    }),
+
+  respondToInvitation: (token, invitationId, response) =>
+    request(`/invitations/${invitationId}/${response}`, {
+      method: "POST",
+      token,
+    }),
 };
 
 export { ApiError };

@@ -10,15 +10,21 @@ class ApiError extends Error {
   }
 }
 
-async function request(path, { method = "GET", body, token } = {}) {
-  const headers = { "Content-Type": "application/json" };
+async function request(
+  path,
+  { method = "GET", body, token, extraHeaders = {} } = {},
+) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...extraHeaders,
+  };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
 
   if (response.status === 204) return null;
 
@@ -52,8 +58,15 @@ export const api = {
   projectTasks: (projectId, token) =>
     request(`/projects/${encodeURIComponent(projectId)}/tasks`, { token }),
 
-  createTask: (fields, token) =>
-    request("/tasks", { method: "POST", body: fields, token }),
+  createTask: (fields, token, idempotencyKey) =>
+    request("/tasks", {
+      method: "POST",
+      body: fields,
+      token,
+      extraHeaders: {
+        "Idempotency-Key": idempotencyKey,
+      },
+    }),
 
   createProject: (token, name) =>
     request("/projects", { method: "POST", body: { name }, token }),

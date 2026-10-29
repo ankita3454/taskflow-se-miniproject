@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api.js";
 
 const emptyFields = {
@@ -21,7 +21,12 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const selectedProject = projects.find((project) => project.id === projectId);
+  // Retains the idempotency key for a submission that may need retrying.
+  const pendingSubmission = useRef(null);
+
+  const selectedProject = projects.find(
+    (project) => project.id === projectId,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +40,7 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
         if (cancelled) return;
 
         setProjects(result.projects);
+
         setProjectId((current) => {
           if (result.projects.some((project) => project.id === current)) {
             return current;
@@ -55,7 +61,9 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
           setError(err.message);
         }
       } finally {
-        if (!cancelled) setLoadingProjects(false);
+        if (!cancelled) {
+          setLoadingProjects(false);
+        }
       }
     }
 
@@ -80,7 +88,10 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
 
       try {
         const result = await api.projectTasks(projectId, token);
-        if (!cancelled) setTasks(result.tasks);
+
+        if (!cancelled) {
+          setTasks(result.tasks);
+        }
       } catch (err) {
         if (cancelled) return;
 
@@ -91,7 +102,9 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
           setTasks([]);
         }
       } finally {
-        if (!cancelled) setLoadingTasks(false);
+        if (!cancelled) {
+          setLoadingTasks(false);
+        }
       }
     }
 
@@ -105,8 +118,19 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
   function updateField(event) {
     const { name, value } = event.target;
 
-    setFields((current) => ({ ...current, [name]: value }));
-    setFieldErrors((current) => ({ ...current, [name]: "" }));
+    // A changed payload must not reuse the previous submission's key.
+    pendingSubmission.current = null;
+
+    setFields((current) => ({
+      ...current,
+      [name]: value,
+    }));
+
+    setFieldErrors((current) => ({
+      ...current,
+      [name]: "",
+    }));
+
     setError("");
     setNotice("");
   }
@@ -129,13 +153,39 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
       priority: fields.priority,
       dueDate: fields.dueDate || null,
       timeEstimate:
-        fields.timeEstimate === "" ? null : Number(fields.timeEstimate),
+        fields.timeEstimate === ""
+          ? null
+          : Number(fields.timeEstimate),
     };
+
+    const payloadSignature = JSON.stringify(payload);
+
+    // Reuse the key for an unchanged submission after a failed request.
+    // Generate a new key when there is no pending submission or its
+    // payload differs from the current submission.
+    if (
+      !pendingSubmission.current ||
+      pendingSubmission.current.payloadSignature !== payloadSignature
+    ) {
+      pendingSubmission.current = {
+        payloadSignature,
+        key: crypto.randomUUID(),
+      };
+    }
+
+    const idempotencyKey = pendingSubmission.current.key;
 
     setSaving(true);
 
     try {
-      const result = await api.createTask(payload, token);
+      const result = await api.createTask(
+        payload,
+        token,
+        idempotencyKey,
+      );
+
+      // Clear the key only after successful creation.
+      pendingSubmission.current = null;
 
       setTasks((current) => [result.task, ...current]);
       setFields(emptyFields);
@@ -147,6 +197,9 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
         setError(err.message);
         setFieldErrors(err.fields || {});
       }
+
+      // Intentionally keep the pending key so an unchanged submission
+      // can reuse it when retried.
     } finally {
       setSaving(false);
     }
@@ -156,10 +209,20 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
     <section className="task-workspace">
       <h2>Project Tasks</h2>
 
-      {error && <p className="form-error" role="alert">{error}</p>}
-      {notice && <p className="form-status" role="status">{notice}</p>}
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+
+      {notice && (
+        <p className="form-status" role="status">
+          {notice}
+        </p>
+      )}
 
       <label htmlFor="task-project">Project</label>
+
       {loadingProjects ? (
         <p role="status">Loading projects...</p>
       ) : projects.length === 0 ? (
@@ -172,6 +235,7 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
           id="task-project"
           value={projectId}
           onChange={(event) => {
+            pendingSubmission.current = null;
             setProjectId(event.target.value);
             setNotice("");
             setError("");
@@ -179,20 +243,26 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
         >
           {projects.map((project) => (
             <option key={project.id} value={project.id}>
-              {project.name}{project.archived ? " (Archived)" : ""}
+              {project.name}
+              {project.archived ? " (Archived)" : ""}
             </option>
           ))}
         </select>
       )}
 
       {selectedProject?.archived && (
-        <p role="status">This project is archived; new tasks cannot be created.</p>
+        <p role="status">
+          This project is archived; new tasks cannot be created.
+        </p>
       )}
 
       <h3>Create a task</h3>
 
       <form className="auth-form" onSubmit={handleSubmit} noValidate>
-        <label htmlFor="task-title">Title (required, max 200 characters)</label>
+        <label htmlFor="task-title">
+          Title (required, max 200 characters)
+        </label>
+
         <input
           id="task-title"
           name="title"
@@ -201,15 +271,21 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
           maxLength={201}
           required
           aria-invalid={Boolean(fieldErrors.title)}
-          aria-describedby={fieldErrors.title ? "task-title-error" : undefined}
+          aria-describedby={
+            fieldErrors.title ? "task-title-error" : undefined
+          }
         />
+
         {fieldErrors.title && (
           <p id="task-title-error" className="form-error">
             {fieldErrors.title}
           </p>
         )}
 
-        <label htmlFor="task-description">Description (max 2000 characters)</label>
+        <label htmlFor="task-description">
+          Description (max 2000 characters)
+        </label>
+
         <textarea
           id="task-description"
           name="description"
@@ -219,11 +295,13 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
           rows={3}
           aria-invalid={Boolean(fieldErrors.description)}
         />
+
         {fieldErrors.description && (
           <p className="form-error">{fieldErrors.description}</p>
         )}
 
         <label htmlFor="task-priority">Priority</label>
+
         <select
           id="task-priority"
           name="priority"
@@ -236,11 +314,13 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
           <option value="HIGH">High</option>
           <option value="CRITICAL">Critical</option>
         </select>
+
         {fieldErrors.priority && (
           <p className="form-error">{fieldErrors.priority}</p>
         )}
 
         <label htmlFor="task-due-date">Due date (optional)</label>
+
         <input
           id="task-due-date"
           name="dueDate"
@@ -248,11 +328,15 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
           value={fields.dueDate}
           onChange={updateField}
         />
+
         {fieldErrors.dueDate && (
           <p className="form-error">{fieldErrors.dueDate}</p>
         )}
 
-        <label htmlFor="task-time-estimate">Time estimate in hours (optional)</label>
+        <label htmlFor="task-time-estimate">
+          Time estimate in hours (optional)
+        </label>
+
         <input
           id="task-time-estimate"
           name="timeEstimate"
@@ -263,6 +347,7 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
           onChange={updateField}
           aria-invalid={Boolean(fieldErrors.timeEstimate)}
         />
+
         {fieldErrors.timeEstimate && (
           <p className="form-error">{fieldErrors.timeEstimate}</p>
         )}
@@ -292,11 +377,15 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
             <li key={task.id}>
               <strong>{task.title}</strong>
               <span> — {task.status.replaceAll("_", " ")}</span>
+
               <p>Priority: {task.priority}</p>
+
               {task.description && <p>{task.description}</p>}
+
               {task.dueDate && (
                 <p>Due: {String(task.dueDate).slice(0, 10)}</p>
               )}
+
               {task.timeEstimate != null && (
                 <p>Estimate: {task.timeEstimate} hours</p>
               )}

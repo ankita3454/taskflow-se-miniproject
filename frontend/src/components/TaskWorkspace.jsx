@@ -1,0 +1,398 @@
+import { useEffect, useRef, useState } from "react";
+import { api } from "../lib/api.js";
+
+const emptyFields = {
+  title: "",
+  description: "",
+  priority: "MEDIUM",
+  dueDate: "",
+  timeEstimate: "",
+};
+
+export default function TaskWorkspace({ token, onSessionExpired }) {
+  const [projects, setProjects] = useState([]);
+  const [projectId, setProjectId] = useState("");
+  const [tasks, setTasks] = useState([]);
+  const [fields, setFields] = useState(emptyFields);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Retains the idempotency key for a submission that may need retrying.
+  const pendingSubmission = useRef(null);
+
+  const selectedProject = projects.find(
+    (project) => project.id === projectId,
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProjects() {
+      setLoadingProjects(true);
+      setError("");
+
+      try {
+        const result = await api.projects(token);
+        if (cancelled) return;
+
+        setProjects(result.projects);
+
+        setProjectId((current) => {
+          if (result.projects.some((project) => project.id === current)) {
+            return current;
+          }
+
+          const activeProject = result.projects.find(
+            (project) => !project.archived,
+          );
+
+          return (activeProject || result.projects[0])?.id || "";
+        });
+      } catch (err) {
+        if (cancelled) return;
+
+        if (err.status === 401) {
+          onSessionExpired();
+        } else {
+          setError(err.message);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingProjects(false);
+        }
+      }
+    }
+
+    loadProjects();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, onSessionExpired]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTasks() {
+      if (!projectId) {
+        setTasks([]);
+        return;
+      }
+
+      setLoadingTasks(true);
+      setError("");
+
+      try {
+        const result = await api.projectTasks(projectId, token);
+
+        if (!cancelled) {
+          setTasks(result.tasks);
+        }
+      } catch (err) {
+        if (cancelled) return;
+
+        if (err.status === 401) {
+          onSessionExpired();
+        } else {
+          setError(err.message);
+          setTasks([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingTasks(false);
+        }
+      }
+    }
+
+    loadTasks();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, token, onSessionExpired]);
+
+  function updateField(event) {
+    const { name, value } = event.target;
+
+    // A changed payload must not reuse the previous submission's key.
+    pendingSubmission.current = null;
+
+    setFields((current) => ({
+      ...current,
+      [name]: value,
+    }));
+
+    setFieldErrors((current) => ({
+      ...current,
+      [name]: "",
+    }));
+
+    setError("");
+    setNotice("");
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+    setFieldErrors({});
+
+    if (!projectId) {
+      setError("Select a project before creating a task.");
+      return;
+    }
+
+    const payload = {
+      projectId,
+      title: fields.title,
+      description: fields.description,
+      priority: fields.priority,
+      dueDate: fields.dueDate || null,
+      timeEstimate:
+        fields.timeEstimate === ""
+          ? null
+          : Number(fields.timeEstimate),
+    };
+
+    const payloadSignature = JSON.stringify(payload);
+
+    // Reuse the key for an unchanged submission after a failed request.
+    // Generate a new key when there is no pending submission or its
+    // payload differs from the current submission.
+    if (
+      !pendingSubmission.current ||
+      pendingSubmission.current.payloadSignature !== payloadSignature
+    ) {
+      pendingSubmission.current = {
+        payloadSignature,
+        key: crypto.randomUUID(),
+      };
+    }
+
+    const idempotencyKey = pendingSubmission.current.key;
+
+    setSaving(true);
+
+    try {
+      const result = await api.createTask(
+        payload,
+        token,
+        idempotencyKey,
+      );
+
+      // Clear the key only after successful creation.
+      pendingSubmission.current = null;
+
+      setTasks((current) => [result.task, ...current]);
+      setFields(emptyFields);
+      setNotice("Task created successfully.");
+    } catch (err) {
+      if (err.status === 401) {
+        onSessionExpired();
+      } else {
+        setError(err.message);
+        setFieldErrors(err.fields || {});
+      }
+
+      // Intentionally keep the pending key so an unchanged submission
+      // can reuse it when retried.
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="task-workspace">
+      <h2>Project Tasks</h2>
+
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+
+      {notice && (
+        <p className="form-status" role="status">
+          {notice}
+        </p>
+      )}
+
+      <label htmlFor="task-project">Project</label>
+
+      {loadingProjects ? (
+        <p role="status">Loading projects...</p>
+      ) : projects.length === 0 ? (
+        <p>
+          You don't have any projects yet. Create a project first, or ask a
+          project owner to add you as a member.
+        </p>
+      ) : (
+        <select
+          id="task-project"
+          value={projectId}
+          onChange={(event) => {
+            pendingSubmission.current = null;
+            setProjectId(event.target.value);
+            setNotice("");
+            setError("");
+          }}
+        >
+          {projects.map((project) => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+              {project.archived ? " (Archived)" : ""}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {selectedProject?.archived && (
+        <p role="status">
+          This project is archived; new tasks cannot be created.
+        </p>
+      )}
+
+      <h3>Create a task</h3>
+
+      <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        <label htmlFor="task-title">
+          Title (required, max 200 characters)
+        </label>
+
+        <input
+          id="task-title"
+          name="title"
+          value={fields.title}
+          onChange={updateField}
+          maxLength={201}
+          required
+          aria-invalid={Boolean(fieldErrors.title)}
+          aria-describedby={
+            fieldErrors.title ? "task-title-error" : undefined
+          }
+        />
+
+        {fieldErrors.title && (
+          <p id="task-title-error" className="form-error">
+            {fieldErrors.title}
+          </p>
+        )}
+
+        <label htmlFor="task-description">
+          Description (max 2000 characters)
+        </label>
+
+        <textarea
+          id="task-description"
+          name="description"
+          value={fields.description}
+          onChange={updateField}
+          maxLength={2001}
+          rows={3}
+          aria-invalid={Boolean(fieldErrors.description)}
+        />
+
+        {fieldErrors.description && (
+          <p className="form-error">{fieldErrors.description}</p>
+        )}
+
+        <label htmlFor="task-priority">Priority</label>
+
+        <select
+          id="task-priority"
+          name="priority"
+          value={fields.priority}
+          onChange={updateField}
+          required
+        >
+          <option value="LOW">Low</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="HIGH">High</option>
+          <option value="CRITICAL">Critical</option>
+        </select>
+
+        {fieldErrors.priority && (
+          <p className="form-error">{fieldErrors.priority}</p>
+        )}
+
+        <label htmlFor="task-due-date">Due date (optional)</label>
+
+        <input
+          id="task-due-date"
+          name="dueDate"
+          type="date"
+          value={fields.dueDate}
+          onChange={updateField}
+        />
+
+        {fieldErrors.dueDate && (
+          <p className="form-error">{fieldErrors.dueDate}</p>
+        )}
+
+        <label htmlFor="task-time-estimate">
+          Time estimate in hours (optional)
+        </label>
+
+        <input
+          id="task-time-estimate"
+          name="timeEstimate"
+          type="number"
+          min="0"
+          step="0.5"
+          value={fields.timeEstimate}
+          onChange={updateField}
+          aria-invalid={Boolean(fieldErrors.timeEstimate)}
+        />
+
+        {fieldErrors.timeEstimate && (
+          <p className="form-error">{fieldErrors.timeEstimate}</p>
+        )}
+
+        <button
+          type="submit"
+          disabled={
+            saving ||
+            loadingProjects ||
+            !selectedProject ||
+            selectedProject.archived
+          }
+        >
+          {saving ? "Creating..." : "Create task"}
+        </button>
+      </form>
+
+      <h3>Task list</h3>
+
+      {loadingTasks ? (
+        <p role="status">Loading tasks...</p>
+      ) : tasks.length === 0 ? (
+        <p>No tasks in this project yet.</p>
+      ) : (
+        <ul className="task-list">
+          {tasks.map((task) => (
+            <li key={task.id}>
+              <strong>{task.title}</strong>
+              <span> — {task.status.replaceAll("_", " ")}</span>
+
+              <p>Priority: {task.priority}</p>
+
+              {task.description && <p>{task.description}</p>}
+
+              {task.dueDate && (
+                <p>Due: {String(task.dueDate).slice(0, 10)}</p>
+              )}
+
+              {task.timeEstimate != null && (
+                <p>Estimate: {task.timeEstimate} hours</p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}

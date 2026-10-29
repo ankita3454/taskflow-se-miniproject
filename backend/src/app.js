@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import authRoutes from "./routes/auth.routes.js";
+import taskRoutes from "./routes/task.routes.js";
 import projectRoutes from "./routes/projects.routes.js";
 import invitationRoutes from "./routes/invitations.routes.js";
 
@@ -22,6 +23,7 @@ app.get("/api/v1/health", (_req, res) => {
 });
 
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1", taskRoutes);
 app.use("/api/v1/projects", projectRoutes);
 app.use("/api/v1", invitationRoutes);
 

@@ -25,6 +25,7 @@ model User {
   memberships   ProjectMember[]
 
   assignedTasks Task[] @relation("TaskAssignee")
+  taskCreationRequests TaskCreationRequest[]
 
   @@map("users")
 }
@@ -86,5 +87,22 @@ model Task {
 
   @@index([projectId, status])
   @@index([assigneeId])
+
+  creationRequest TaskCreationRequest?
+
   @@map("tasks")
+}
+model TaskCreationRequest {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  key         String   @db.VarChar(255)
+  payloadHash String   @map("payload_hash") @db.VarChar(64)
+  taskId      String?  @unique @map("task_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@map("task_creation_requests")
 }

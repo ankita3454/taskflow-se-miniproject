@@ -55,10 +55,11 @@ router.post(
   requireProjectMember(),
   handle(async (req, res) => {
     const task = await createTask({
-      body: req.body,
-      userId: req.user.id,
-      projectAccess: req.projectAccess,
-    });
+  body: req.body,
+  userId: req.user.id,
+  projectAccess: req.projectAccess,
+  idempotencyKey: req.get("Idempotency-Key"),
+  });
 
     res.status(201).json({ task });
   }),

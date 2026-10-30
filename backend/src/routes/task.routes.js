@@ -8,24 +8,12 @@ import {
 import {
   createTask,
   listProjectTasks,
-  listAccessibleProjects,
   changeTaskStatus,
   updateTask,
   TaskError,
 } from "../services/taskService.js";
 
 const router = Router();
-
-// GET /api/v1/projects
-// Lists only projects the authenticated user can access.
-router.get(
-  "/projects",
-  requireAuth,
-  handle(async (req, res) => {
-    const projects = await listAccessibleProjects(req.user.id);
-    res.status(200).json({ projects });
-  }),
-);
 
 function handle(fn) {
   return async (req, res) => {

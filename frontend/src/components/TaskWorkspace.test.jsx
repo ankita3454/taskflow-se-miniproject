@@ -12,10 +12,11 @@ import TaskWorkspace from "./TaskWorkspace.jsx";
 import { api } from "../lib/api.js";
 
 vi.mock("../lib/api.js", () => ({
-  api: {
-    projects: vi.fn(),
-    projectTasks: vi.fn(),
-    createTask: vi.fn(),
+    api: {
+      projects: vi.fn(),
+      projectTasks: vi.fn(),
+      createTask: vi.fn(),
+      changeTaskStatus: vi.fn(),
   },
 }));
 
@@ -184,4 +185,105 @@ describe("TaskWorkspace idempotency", () => {
     expect(api.createTask.mock.calls[0][0].title).toBe("Original task");
     expect(api.createTask.mock.calls[1][0].title).toBe("Updated task");
   });
+
+it("updates the displayed status after a successful change", async () => {
+  const task = createdTask("Status task", "task-status");
+
+  api.projects.mockResolvedValue({ projects: [project] });
+  api.projectTasks.mockResolvedValue({ tasks: [task] });
+  api.changeTaskStatus.mockResolvedValue({
+    task: { ...task, status: "IN_PROGRESS" },
+  });
+
+  render(
+    <TaskWorkspace
+      api={api}
+      token="test-token"
+      onSessionExpired={vi.fn()}
+    />,
+  );
+
+  const statusSelect = await screen.findByRole("combobox", {
+    name: "Status for Status task",
+  });
+
+  fireEvent.change(statusSelect, {
+    target: { value: "IN_PROGRESS" },
+  });
+
+  await waitFor(() => {
+    expect(api.changeTaskStatus).toHaveBeenCalledWith(
+      "task-status",
+      "IN_PROGRESS",
+      "test-token",
+    );
+    expect(statusSelect).toHaveValue("IN_PROGRESS");
+  });
+});
+
+it("preserves the original status and displays an error when a change fails", async () => {
+  const task = createdTask("Status task", "task-status");
+
+  api.projects.mockResolvedValue({ projects: [project] });
+  api.projectTasks.mockResolvedValue({ tasks: [task] });
+  api.changeTaskStatus.mockRejectedValue(
+    new Error("Invalid status transition"),
+  );
+
+  render(
+    <TaskWorkspace
+      api={api}
+      token="test-token"
+      onSessionExpired={vi.fn()}
+    />,
+  );
+
+  const statusSelect = await screen.findByRole("combobox", {
+    name: "Status for Status task",
+  });
+
+  fireEvent.change(statusSelect, {
+    target: { value: "IN_PROGRESS" },
+  });
+
+  expect(
+    await screen.findByText("Invalid status transition"),
+  ).toBeInTheDocument();
+
+  expect(statusSelect).toHaveValue("TODO");
+});
+
+it("expires the session when the status change returns 401", async () => {
+  const task = createdTask("Status task", "task-status");
+  const onSessionExpired = vi.fn();
+  const error = new Error("Authentication required");
+  error.status = 401;
+
+  api.projects.mockResolvedValue({ projects: [project] });
+  api.projectTasks.mockResolvedValue({ tasks: [task] });
+  api.changeTaskStatus.mockRejectedValue(error);
+
+  render(
+    <TaskWorkspace
+      api={api}
+      token="test-token"
+      onSessionExpired={onSessionExpired}
+    />,
+  );
+
+  const statusSelect = await screen.findByRole("combobox", {
+    name: "Status for Status task",
+  });
+
+  fireEvent.change(statusSelect, {
+    target: { value: "IN_PROGRESS" },
+  });
+
+  await waitFor(() => {
+    expect(onSessionExpired).toHaveBeenCalledOnce();
+  });
+
+  expect(statusSelect).toHaveValue("TODO");
+});
+
 });

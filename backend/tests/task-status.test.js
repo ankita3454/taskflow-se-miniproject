@@ -128,6 +128,19 @@ before(async () => {
 
 after(async () => {
   if (project) {
+    const projectTasks = await prisma.task.findMany({
+      where: { projectId: project.id },
+      select: { id: true },
+    });
+
+    await prisma.activityLog.deleteMany({
+      where: {
+        taskId: {
+          in: projectTasks.map((task) => task.id),
+        },
+      },
+    });
+
     await prisma.task.deleteMany({
       where: { projectId: project.id },
     });
@@ -141,7 +154,6 @@ after(async () => {
     });
   }
 
-  // ADD THIS BLOCK HERE
   if (otherProject) {
     await prisma.projectMember.deleteMany({
       where: { projectId: otherProject.id },
@@ -152,20 +164,18 @@ after(async () => {
     });
   }
 
-  // Existing cleanup continues below
   await prisma.user.deleteMany({
     where: { email: { startsWith: `task-status-${RUN_ID}-` } },
   });
 
   if (server) {
     await new Promise((resolve, reject) => {
-      server.close((error) => error ? reject(error) : resolve());
+      server.close((error) => (error ? reject(error) : resolve()));
     });
   }
 
   await prisma.$disconnect();
 });
-
 
 describe("Issue #7: Task Status Workflow", () => {
   test("TODO → IN_PROGRESS is allowed", async () => {
@@ -182,6 +192,18 @@ describe("Issue #7: Task Status Workflow", () => {
 
     const saved = await prisma.task.findUnique({ where: { id: task.id } });
     assert.equal(saved.status, "IN_PROGRESS");
+    // Verify the status transition was logged.
+    const logs = await prisma.activityLog.findMany({
+      where: { taskId: task.id },
+    });
+
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0].actorId, users.assignee.id);
+    assert.equal(logs[0].field, "status");
+    assert.equal(logs[0].oldValue, "TODO");
+    assert.equal(logs[0].newValue, "IN_PROGRESS");
+    assert.ok(logs[0].createdAt instanceof Date);
+    assert.ok(!Number.isNaN(logs[0].createdAt.getTime()));
   });
 
   test("IN_PROGRESS → IN_REVIEW is allowed", async () => {
@@ -224,9 +246,10 @@ describe("Issue #7: Task Status Workflow", () => {
   });
 
   test("IN_PROGRESS → TODO is allowed only when unassigned", async () => {
+    // An unassigned task is allowed to transition back to TODO.
     const unassignedTask = await makeTask({
-        status: "IN_PROGRESS",
-        assigneeId: null,
+      status: "IN_PROGRESS",
+      assigneeId: null,
     });
 
     const allowed = await call(`/api/v1/tasks/${unassignedTask.id}/status`, {
@@ -238,6 +261,19 @@ describe("Issue #7: Task Status Workflow", () => {
     assert.equal(allowed.status, 200);
     assert.equal(allowed.body.task.status, "TODO");
 
+    // Verify that the successful transition was logged.
+    const allowedLogs = await prisma.activityLog.findMany({
+      where: { taskId: unassignedTask.id },
+    });
+
+    assert.equal(allowedLogs.length, 1);
+    assert.equal(allowedLogs[0].actorId, users.owner.id);
+    assert.equal(allowedLogs[0].field, "status");
+    assert.equal(allowedLogs[0].oldValue, "IN_PROGRESS");
+    assert.equal(allowedLogs[0].newValue, "TODO");
+    assert.ok(allowedLogs[0].createdAt instanceof Date);
+
+    // An assigned task is not allowed to transition back to TODO.
     const assignedTask = await makeTask({
       status: "IN_PROGRESS",
       assigneeId: users.assignee.id,
@@ -255,7 +291,15 @@ describe("Issue #7: Task Status Workflow", () => {
     const saved = await prisma.task.findUnique({
       where: { id: assignedTask.id },
     });
+
     assert.equal(saved.status, "IN_PROGRESS");
+
+    // Verify that the rejected transition did not create an activity log.
+    const rejectedLogs = await prisma.activityLog.findMany({
+      where: { taskId: assignedTask.id },
+    });
+
+    assert.equal(rejectedLogs.length, 0);
   });
 
   test("TODO → DONE is rejected and status remains unchanged", async () => {
@@ -272,6 +316,13 @@ describe("Issue #7: Task Status Workflow", () => {
 
     const saved = await prisma.task.findUnique({ where: { id: task.id } });
     assert.equal(saved.status, "TODO");
+
+    // A rejected transition must not create an activity log.
+    const logs = await prisma.activityLog.findMany({
+      where: { taskId: task.id },
+    });
+
+    assert.equal(logs.length, 0);
   });
 
   test("DONE cannot transition to another status", async () => {

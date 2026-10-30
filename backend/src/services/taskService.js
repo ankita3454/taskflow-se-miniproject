@@ -1,5 +1,5 @@
-
 import prisma from "../repositories/prisma.js";
+import { Prisma } from "@prisma/client";
 import { createHash } from "node:crypto";
 
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
@@ -407,7 +407,7 @@ const VALID_TASK_STATUSES = [
   "DONE",
 ];
 
-export async function changeTaskStatus({ taskId, status }) {
+export async function changeTaskStatus({ taskId, status, userId }) {
   if (
     typeof status !== "string" ||
     !VALID_TASK_STATUSES.includes(status)
@@ -422,57 +422,66 @@ export async function changeTaskStatus({ taskId, status }) {
     );
   }
 
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
-  });
+  return prisma.$transaction(async (tx) => {
+    const task = await tx.task.findUnique({
+      where: { id: taskId },
+    });
 
-  if (!task) {
-    throw new TaskError(404, "NOT_FOUND", "Task not found");
-  }
+    if (!task) {
+      throw new TaskError(404, "NOT_FOUND", "Task not found");
+    }
 
-  const allowed = ALLOWED_STATUS_TRANSITIONS[task.status] ?? [];
+    const allowed = ALLOWED_STATUS_TRANSITIONS[task.status] ?? [];
 
-  const isUnassignedReturn =
-    task.status === "IN_PROGRESS" &&
-    status === "TODO" &&
-    task.assigneeId === null;
+    const isUnassignedReturn =
+      task.status === "IN_PROGRESS" &&
+      status === "TODO" &&
+      task.assigneeId === null;
 
-  if (!allowed.includes(status) && !isUnassignedReturn) {
-    throw new TaskError(
-      400,
-      "INVALID_STATUS_TRANSITION",
-      `Cannot change status from ${task.status} to ${status}`,
-      {
-        status: `Transition from ${task.status} to ${status} is not allowed`,
+    if (!allowed.includes(status) && !isUnassignedReturn) {
+      throw new TaskError(
+        400,
+        "INVALID_STATUS_TRANSITION",
+        `Cannot change status from ${task.status} to ${status}`,
+        {
+          status: `Transition from ${task.status} to ${status} is not allowed`,
+        },
+      );
+    }
+
+    const result = await tx.task.updateMany({
+      where: {
+        id: taskId,
+        status: task.status,
+        ...(isUnassignedReturn ? { assigneeId: null } : {}),
       },
-    );
-  }
+      data: { status },
+    });
 
-  // Conditional update prevents a transition based on stale status.
-  const result = await prisma.task.updateMany({
-    where: {
-      id: taskId,
-      status: task.status,
-      ...(isUnassignedReturn ? { assigneeId: null } : {}),
-    },
-    data: { status },
-  });
+    if (result.count !== 1) {
+      throw new TaskError(
+        409,
+        "STATUS_CHANGED_CONCURRENTLY",
+        "The task changed while this request was being processed. Refresh and try again.",
+      );
+    }
 
-  if (result.count !== 1) {
-    throw new TaskError(
-      409,
-      "STATUS_CHANGED_CONCURRENTLY",
-      "The task changed while this request was being processed. Refresh and try again.",
-    );
-  }
+    await recordTaskActivity(tx, {
+      taskId,
+      actorId: userId,
+      changes: [
+        {
+          field: "status",
+          oldValue: task.status,
+          newValue: status,
+        },
+      ],
+    });
 
-  return prisma.task.findUnique({
-    where: { id: taskId },
-    include: {
-      assignee: {
-        select: { id: true, name: true, email: true },
-      },
-    },
+    return tx.task.findUnique({
+      where: { id: taskId },
+      include: TASK_INCLUDE,
+    });
   });
 }
 
@@ -489,7 +498,7 @@ const EDITABLE_TASK_FIELDS = [
  * The route must authenticate the user and enforce Project Owner access.
  * A completed task cannot be edited.
  */
-export async function updateTask({ taskId, body }) {
+export async function updateTask({ taskId, body, userId }) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     invalid("Request body must be a JSON object");
   }
@@ -531,9 +540,8 @@ export async function updateTask({ taskId, body }) {
       });
     }
 
-    data.description = body.description === null
-      ? null
-      : body.description.trim();
+    data.description =
+      body.description === null ? null : body.description.trim();
 
     if (data.description?.length > MAX_DESCRIPTION_LENGTH) {
       invalid(
@@ -591,53 +599,96 @@ export async function updateTask({ taskId, body }) {
     }
   }
 
-  // Check completion before updating.
-  const existing = await prisma.task.findUnique({
-    where: { id: taskId },
-    select: { id: true, status: true },
-  });
-
-  if (!existing) {
-    throw new TaskError(404, "NOT_FOUND", "Task not found");
-  }
-
-  if (existing.status === "DONE") {
-    throw new TaskError(
-      409,
-      "TASK_COMPLETED",
-      "Completed tasks cannot be edited",
-    );
-  }
-
-  // The status condition also protects against a task becoming DONE
-  // between the check above and the database update.
-  const result = await prisma.task.updateMany({
-    where: {
-      id: taskId,
-      status: { not: "DONE" },
-    },
-    data,
-  });
-
-  if (result.count === 0) {
-    const current = await prisma.task.findUnique({
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.task.findUnique({
       where: { id: taskId },
-      select: { id: true, status: true },
     });
 
-    if (!current) {
+    if (!existing) {
       throw new TaskError(404, "NOT_FOUND", "Task not found");
     }
 
-    throw new TaskError(
-      409,
-      "TASK_COMPLETED",
-      "Completed tasks cannot be edited",
-    );
-  }
+    if (existing.status === "DONE") {
+      throw new TaskError(
+        409,
+        "TASK_COMPLETED",
+        "Completed tasks cannot be edited",
+      );
+    }
 
-  return prisma.task.findUnique({
-    where: { id: taskId },
-    include: TASK_INCLUDE,
+    const changes = [];
+
+    for (const field of Object.keys(data)) {
+      const oldValue =
+        field === "dueDate"
+          ? dateValue(existing.dueDate)
+          : existing[field];
+
+      const newValue =
+        field === "dueDate"
+          ? dateValue(data.dueDate)
+          : data[field];
+
+      if (oldValue !== newValue) {
+        changes.push({
+          field,
+          oldValue,
+          newValue,
+        });
+      }
+    }
+
+    const result = await tx.task.updateMany({
+      where: {
+        id: taskId,
+        status: { not: "DONE" },
+      },
+      data,
+    });
+
+    if (result.count === 0) {
+      const current = await tx.task.findUnique({
+        where: { id: taskId },
+        select: { id: true, status: true },
+      });
+
+      if (!current) {
+        throw new TaskError(404, "NOT_FOUND", "Task not found");
+      }
+
+      throw new TaskError(
+        409,
+        "TASK_COMPLETED",
+        "Completed tasks cannot be edited",
+      );
+    }
+
+    await recordTaskActivity(tx, {
+      taskId,
+      actorId: userId,
+      changes,
+    });
+
+    return tx.task.findUnique({
+      where: { id: taskId },
+      include: TASK_INCLUDE,
+    });
   });
+}
+async function recordTaskActivity(tx, { taskId, actorId, changes }) {
+  if (changes.length === 0) return;
+
+  await tx.activityLog.createMany({
+    data: changes.map(({ field, oldValue, newValue }) => ({
+      taskId,
+      actorId,
+      field,
+      oldValue: oldValue === null ? Prisma.JsonNull : oldValue,
+      newValue: newValue === null ? Prisma.JsonNull : newValue,
+    })),
+  });
+}
+
+function dateValue(value) {
+  return value === null ? null : value.toISOString().slice(0, 10);
 }

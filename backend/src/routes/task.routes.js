@@ -1,10 +1,14 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth.js";
-import { requireProjectMember } from "../middleware/permissions.js";
+import {
+  requireProjectMember,
+  requireTaskStatusChange,
+} from "../middleware/permissions.js";
 import {
   createTask,
   listProjectTasks,
   listAccessibleProjects,
+  changeTaskStatus,
   TaskError,
 } from "../services/taskService.js";
 
@@ -75,5 +79,19 @@ router.get(
     res.status(200).json({ tasks });
   }),
 );
+// PATCH /api/v1/tasks/:taskId/status
+// Only the task assignee or project Owner may change status.
+router.patch(
+  "/tasks/:taskId/status",
+  requireAuth,
+  requireTaskStatusChange(),
+  handle(async (req, res) => {
+    const task = await changeTaskStatus({
+      taskId: req.params.taskId,
+      status: req.body?.status,
+    });
 
+    res.status(200).json({ task });
+  }),
+);
 export default router;

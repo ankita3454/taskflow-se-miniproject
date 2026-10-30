@@ -68,6 +68,13 @@ export const api = {
       },
     }),
 
+  changeTaskStatus: (taskId, status, token) =>
+    request(`/tasks/${encodeURIComponent(taskId)}/status`, {
+      method: "PATCH",
+      body: { status },
+      token,
+    }),
+
   createProject: (token, name) =>
     request("/projects", { method: "POST", body: { name }, token }),
 

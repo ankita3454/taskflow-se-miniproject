@@ -3,6 +3,14 @@ import prisma from "../repositories/prisma.js";
 import { createHash } from "node:crypto";
 
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "CRITICAL"];
+
+const ALLOWED_STATUS_TRANSITIONS = {
+  TODO: ["IN_PROGRESS"],
+  IN_PROGRESS: ["IN_REVIEW"],
+  IN_REVIEW: ["IN_PROGRESS", "DONE"],
+  DONE: [],
+};
+
 const MAX_TITLE_LENGTH = 200;
 const MAX_DESCRIPTION_LENGTH = 2000;
 const MAX_IDEMPOTENCY_KEY_LENGTH = 255;
@@ -389,5 +397,81 @@ export async function listAccessibleProjects(userId) {
       ownerId: true,
     },
     orderBy: { name: "asc" },
+  });
+}
+
+const VALID_TASK_STATUSES = [
+  "TODO",
+  "IN_PROGRESS",
+  "IN_REVIEW",
+  "DONE",
+];
+
+export async function changeTaskStatus({ taskId, status }) {
+  if (
+    typeof status !== "string" ||
+    !VALID_TASK_STATUSES.includes(status)
+  ) {
+    throw new TaskError(
+      400,
+      "VALIDATION_ERROR",
+      "Status must be one of: TODO, IN_PROGRESS, IN_REVIEW, DONE",
+      {
+        status: "Provide a valid task status",
+      },
+    );
+  }
+
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+  });
+
+  if (!task) {
+    throw new TaskError(404, "NOT_FOUND", "Task not found");
+  }
+
+  const allowed = ALLOWED_STATUS_TRANSITIONS[task.status] ?? [];
+
+  const isUnassignedReturn =
+    task.status === "IN_PROGRESS" &&
+    status === "TODO" &&
+    task.assigneeId === null;
+
+  if (!allowed.includes(status) && !isUnassignedReturn) {
+    throw new TaskError(
+      400,
+      "INVALID_STATUS_TRANSITION",
+      `Cannot change status from ${task.status} to ${status}`,
+      {
+        status: `Transition from ${task.status} to ${status} is not allowed`,
+      },
+    );
+  }
+
+  // Conditional update prevents a transition based on stale status.
+  const result = await prisma.task.updateMany({
+    where: {
+      id: taskId,
+      status: task.status,
+      ...(isUnassignedReturn ? { assigneeId: null } : {}),
+    },
+    data: { status },
+  });
+
+  if (result.count !== 1) {
+    throw new TaskError(
+      409,
+      "STATUS_CHANGED_CONCURRENTLY",
+      "The task changed while this request was being processed. Refresh and try again.",
+    );
+  }
+
+  return prisma.task.findUnique({
+    where: { id: taskId },
+    include: {
+      assignee: {
+        select: { id: true, name: true, email: true },
+      },
+    },
   });
 }

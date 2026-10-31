@@ -7,6 +7,8 @@ import {
 } from "../middleware/permissions.js";
 import {
   createTask,
+  assignTask,
+  listProjectMembers,
   listProjectTasks,
   changeTaskStatus,
   updateTask,
@@ -105,6 +107,26 @@ router.patch(
       userId: req.user.id,
     });
 
+    res.status(200).json({ task });
+  }),
+);
+
+router.get(
+  "/projects/:projectId/members",
+  requireAuth,
+  requireProjectMember(),
+  handle(async (req, res) => {
+    const members = await listProjectMembers(req.project.id);
+    res.status(200).json({ members });
+  }),
+);
+
+router.patch(
+  "/tasks/:taskId/assignee",
+  requireAuth,
+  requireTaskProjectOwner(),
+  handle(async (req, res) => {
+    const task = await assignTask({ taskId: req.task.id, body: req.body });
     res.status(200).json({ task });
   }),
 );

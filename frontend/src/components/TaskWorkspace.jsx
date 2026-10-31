@@ -17,10 +17,13 @@ const allowedTransitions = {
   DONE: [],
 };
 
-export default function TaskWorkspace({ token, onSessionExpired }) {
+export default function TaskWorkspace({ token, userId, onSessionExpired }) {
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState("");
   const [tasks, setTasks] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [assigningTaskId, setAssigningTaskId] = useState(null);
   const [fields, setFields] = useState(emptyFields);
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
@@ -126,6 +129,40 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
     };
   }, [projectId, token, onSessionExpired]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMembers() {
+      if (!projectId || !userId || selectedProject?.ownerId !== userId) {
+        setMembers([]);
+        setLoadingMembers(false);
+        return;
+      }
+
+      setLoadingMembers(true);
+      try {
+        const result = await api.projectMembers(projectId, token);
+        if (!cancelled) setMembers(result.members);
+      } catch (err) {
+        if (cancelled) return;
+        if (err.status === 401) {
+          onSessionExpired();
+        } else {
+          setError(err.message);
+          setMembers([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingMembers(false);
+      }
+    }
+
+    loadMembers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, token, userId, selectedProject?.ownerId, onSessionExpired]);
+
   function updateField(event) {
     const { name, value } = event.target;
 
@@ -144,6 +181,29 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
 
     setError("");
     setNotice("");
+  }
+
+  async function handleAssigneeChange(task, assigneeId) {
+    if (!assigneeId || assigneeId === task.assigneeId) return;
+    setError("");
+    setNotice("");
+    setAssigningTaskId(task.id);
+
+    try {
+      const result = await api.assignTask(task.id, assigneeId, token);
+      setTasks((current) =>
+        current.map((item) => item.id === task.id ? result.task : item),
+      );
+      setNotice(`Assigned "${task.title}" to ${result.task.assignee.name}.`);
+    } catch (err) {
+      if (err.status === 401) {
+        onSessionExpired();
+      } else {
+        setError(err.message);
+      }
+    } finally {
+      setAssigningTaskId(null);
+    }
   }
 
   async function handleSubmit(event) {
@@ -466,6 +526,32 @@ export default function TaskWorkspace({ token, onSessionExpired }) {
                 {task.timeEstimate != null && (
                   <p>Estimate: {task.timeEstimate} hours</p>
                 )}
+              <p>
+                Assignee: {task.assignee?.name || "Unassigned"}
+              </p>
+              {selectedProject?.ownerId === userId && (
+                <label className="task-assignee-control">
+                  Assign to
+                  <select
+                    aria-label={`Assignee for ${task.title}`}
+                    value={task.assigneeId || ""}
+                    onChange={(event) =>
+                      handleAssigneeChange(task, event.target.value)
+                    }
+                    disabled={loadingMembers || assigningTaskId === task.id}
+                  >
+                    <option value="">Select a project member</option>
+                    {members.map(({ user: member }) => (
+                      <option key={member.id} value={member.id}>
+                        {member.name} ({member.email})
+                      </option>
+                    ))}
+                  </select>
+                  {assigningTaskId === task.id && (
+                    <span role="status">Saving assignment...</span>
+                  )}
+                </label>
+              )}
               </li>
             );
           })}

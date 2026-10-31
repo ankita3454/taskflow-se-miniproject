@@ -94,6 +94,7 @@ export default function App() {
     />
     <TaskWorkspace
       token={token}
+      userId={user.id}
       onSessionExpired={handleSessionExpired}
     />
   </>

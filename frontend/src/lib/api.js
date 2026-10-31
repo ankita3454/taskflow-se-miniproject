@@ -58,6 +58,9 @@ export const api = {
   projectTasks: (projectId, token) =>
     request(`/projects/${encodeURIComponent(projectId)}/tasks`, { token }),
 
+  projectMembers: (projectId, token) =>
+    request(`/projects/${encodeURIComponent(projectId)}/members`, { token }),
+
   createTask: (fields, token, idempotencyKey) =>
     request("/tasks", {
       method: "POST",
@@ -72,6 +75,13 @@ export const api = {
     request(`/tasks/${encodeURIComponent(taskId)}/status`, {
       method: "PATCH",
       body: { status },
+      token,
+    }),
+
+  assignTask: (taskId, assigneeId, token) =>
+    request(`/tasks/${encodeURIComponent(taskId)}/assignee`, {
+      method: "PATCH",
+      body: { assigneeId },
       token,
     }),
 

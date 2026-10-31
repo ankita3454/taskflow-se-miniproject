@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { api, ApiError } from "../lib/api.js";
-import ProjectPanel from "./ProjectPanel.jsx";
 
 export default function ProfileView({
   token,
@@ -55,9 +54,17 @@ export default function ProfileView({
 
   return (
     <div className="profile-view">
-      <h2>Welcome, {user.name}</h2>
+      <div className="profile-identity">
+        <span className="avatar avatar-large">
+          {user.name.slice(0, 1).toUpperCase()}
+        </span>
+        <div>
+          <h2>{user.name}</h2>
+          <p>Account details</p>
+        </div>
+      </div>
       <p className="meta">
-        {user.email} &middot; role: {user.role}
+        {user.email} &middot; system role: {user.role}
       </p>
 
       <form onSubmit={handleSave} className="auth-form">
@@ -94,8 +101,6 @@ export default function ProfileView({
           {saving ? "Saving..." : "Save changes"}
         </button>
       </form>
-
-      <ProjectPanel token={token} userId={user.id} onSessionExpired={onSessionExpired} />
 
       <button
         type="button"

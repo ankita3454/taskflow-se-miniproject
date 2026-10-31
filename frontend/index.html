@@ -3,8 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Apply the saved theme before first paint; storage may be unavailable.
+      try {
+        document.documentElement.dataset.theme =
+          localStorage.getItem("taskflow.theme") === "dark" ? "dark" : "light";
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <meta
+      name="description"
+      content="TaskFlow — your shared workspace for projects, tasks and teamwork."
+    />
+    <title>TaskFlow — Your team workspace</title>
   </head>
   <body>
     <div id="root"></div>

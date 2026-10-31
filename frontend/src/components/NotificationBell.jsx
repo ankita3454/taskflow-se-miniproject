@@ -1,12 +1,26 @@
+import { createPortal } from "react-dom";
+import WorkspaceIcon from "./WorkspaceIcon.jsx";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api.js";
 
-export default function NotificationBell({ token, onSessionExpired }) {
+export default function NotificationBell({
+  token,
+  onSessionExpired,
+  panelTarget = null,
+}) {
   const [notifications, setNotifications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    function closePopover() {
+      setIsOpen(false);
+    }
+    window.addEventListener("hashchange", closePopover);
+    return () => window.removeEventListener("hashchange", closePopover);
+  }, []);
 
   const mutationVersion = useRef(0);
   const mutationPending = useRef(false);
@@ -28,7 +42,11 @@ export default function NotificationBell({ token, onSessionExpired }) {
         const version = mutationVersion.current;
         const data = await api.listNotifications(token);
 
-        if (!cancelled && !mutationPending.current && version === mutationVersion.current) {
+        if (
+          !cancelled &&
+          !mutationPending.current &&
+          version === mutationVersion.current
+        ) {
           setNotifications(data.notifications);
           setError("");
         }
@@ -112,65 +130,103 @@ export default function NotificationBell({ token, onSessionExpired }) {
     }
   }
 
+  const panel = (
+    <div id="notification-panel" className="notification-panel">
+      <div className="notification-heading">
+        <div>
+          <h2>Notifications</h2>
+          <p role="status" aria-live="polite">
+            {loading ? "Loading notifications..." : `${unreadCount} unread`}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={loading || busy || unreadCount === 0}
+          onClick={handleMarkAllRead}
+        >
+          Mark all as read
+        </button>
+      </div>
+      {!loading && notifications.length === 0 && (
+        <div className="notification-empty">
+          <WorkspaceIcon name="notifications" size={38} />
+          <h3>You're all caught up.</h3>
+          <p>No notifications yet.</p>
+          <small>Assignments and task updates will appear here.</small>
+        </div>
+      )}
+      {error && (
+        <p role="alert" className="form-error">
+          {error}
+        </p>
+      )}
+      <ul className="notification-list">
+        {notifications.map((notification) => (
+          <li
+            key={notification.id}
+            className={notification.isRead ? "is-read" : "is-unread"}
+          >
+            <span className="notification-type-icon">
+              <WorkspaceIcon name="tasks" />
+            </span>
+            <div className="notification-copy">
+              <p>
+                {!notification.isRead && (
+                  <strong className="sr-only">Unread: </strong>
+                )}
+                {notification.body}
+              </p>
+              <time dateTime={notification.createdAt}>
+                {new Date(notification.createdAt).toLocaleString()}
+              </time>
+            </div>
+            {!notification.isRead && (
+              <button
+                type="button"
+                className="read-button"
+                disabled={busy}
+                onClick={() => handleMarkRead(notification.id)}
+              >
+                Mark as read
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
   return (
-    <section aria-label="Notifications">
+    <section aria-label="Notifications" className="notification-bell">
       <button
         type="button"
-        aria-expanded={isOpen}
+        className="bell-trigger"
+        aria-expanded={Boolean(panelTarget) || isOpen}
         aria-controls="notification-panel"
         aria-label={`Notifications: ${unreadCount} unread`}
         onClick={() => setIsOpen((current) => !current)}
       >
-        🔔 Notifications ({unreadCount})
+        <WorkspaceIcon name="notifications" />
+        {unreadCount > 0 && <span className="bell-count">{unreadCount}</span>}
       </button>
-
-      {error && <p role="alert">{error}</p>}
-
-      {isOpen && (
-        <div id="notification-panel">
-          <h2>Notifications</h2>
-
-          <p role="status" aria-live="polite">
-            {loading ? "Loading notifications..." : `${unreadCount} unread`}
-          </p>
-
-          <button
-            type="button"
-            disabled={loading || busy || unreadCount === 0}
-            onClick={handleMarkAllRead}
-          >
-            Mark all as read
-          </button>
-
-          {!loading && notifications.length === 0 && (
-            <p>No notifications yet.</p>
+      {panelTarget
+        ? createPortal(panel, panelTarget)
+        : isOpen && (
+            <div className="notification-popover">
+              {panel}
+              <a
+                className="notification-all-link"
+                href="#/notifications"
+                onClick={() => setIsOpen(false)}
+              >
+                View all notifications <WorkspaceIcon name="arrow" size={16} />
+              </a>
+            </div>
           )}
-
-          <ul>
-            {notifications.map((notification) => (
-              <li key={notification.id}>
-                <p>
-                  {!notification.isRead && <strong>Unread: </strong>}
-                  {notification.body}
-                </p>
-
-                <time dateTime={notification.createdAt}>
-                  {new Date(notification.createdAt).toLocaleString()}
-                </time>
-
-                {!notification.isRead && (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => handleMarkRead(notification.id)}
-                  >
-                    Mark as read
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
+      {error && !panelTarget && !isOpen && (
+        <p role="alert" className="bell-error">
+          {error}
+        </p>
       )}
     </section>
   );

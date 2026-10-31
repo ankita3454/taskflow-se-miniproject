@@ -16,7 +16,12 @@ const allowedTransitions = {
   DONE: [],
 };
 
-export default function TaskWorkspace({ token, userId, onSessionExpired }) {
+export default function TaskWorkspace({
+  token,
+  userId,
+  onSessionExpired,
+  projectRevision = 0,
+}) {
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState("");
   const [tasks, setTasks] = useState([]);
@@ -53,9 +58,7 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
     return taskSync.current.scope === scope;
   }
 
-  const selectedProject = projects.find(
-    (project) => project.id === projectId,
-  );
+  const selectedProject = projects.find((project) => project.id === projectId);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,7 +105,7 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
     return () => {
       cancelled = true;
     };
-  }, [token, onSessionExpired]);
+  }, [token, onSessionExpired, projectRevision]);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,8 +119,13 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
         if (taskSync.current.pending > 0) return;
         const version = taskSync.current.version;
         const result = await api.projectTasks(projectId, token);
-        if (cancelled || !isCurrentScope(scope) ||
-            taskSync.current.pending > 0 || version !== taskSync.current.version) return;
+        if (
+          cancelled ||
+          !isCurrentScope(scope) ||
+          taskSync.current.pending > 0 ||
+          version !== taskSync.current.version
+        )
+          return;
         setTasks(result.tasks);
         setTaskRefreshError("");
       } catch (err) {
@@ -129,7 +137,9 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
           // Do not leave project data visible after access is revoked.
           stopped = true;
           setTasks([]);
-          setTaskRefreshError(err.message || "This project is no longer accessible.");
+          setTaskRefreshError(
+            err.message || "This project is no longer accessible.",
+          );
         } else {
           // Retain the last good list and all form fields; retry the next poll.
           setTaskRefreshError("Could not refresh tasks. Retrying shortly.");
@@ -223,7 +233,7 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
       const result = await api.assignTask(task.id, assigneeId, token);
       if (!isCurrentScope(scope)) return;
       setTasks((current) =>
-        current.map((item) => item.id === task.id ? result.task : item),
+        current.map((item) => (item.id === task.id ? result.task : item)),
       );
       setNotice(`Assigned "${task.title}" to ${result.task.assignee.name}.`);
     } catch (err) {
@@ -257,9 +267,7 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
       priority: fields.priority,
       dueDate: fields.dueDate || null,
       timeEstimate:
-        fields.timeEstimate === ""
-          ? null
-          : Number(fields.timeEstimate),
+        fields.timeEstimate === "" ? null : Number(fields.timeEstimate),
     };
 
     const payloadSignature = JSON.stringify(payload);
@@ -281,11 +289,7 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
     setSaving(true);
     const scope = beginTaskMutation();
     try {
-      const result = await api.createTask(
-        payload,
-        token,
-        idempotencyKey,
-      );
+      const result = await api.createTask(payload, token, idempotencyKey);
       if (!isCurrentScope(scope)) return;
       // Clear the key only after successful creation.
       pendingSubmission.current = null;
@@ -318,22 +322,14 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
 
     const scope = beginTaskMutation();
     try {
-      const result = await api.changeTaskStatus(
-        task.id,
-        nextStatus,
-        token,
-      );
+      const result = await api.changeTaskStatus(task.id, nextStatus, token);
       if (!isCurrentScope(scope)) return;
 
       setTasks((current) =>
-        current.map((item) =>
-          item.id === task.id ? result.task : item,
-        ),
+        current.map((item) => (item.id === task.id ? result.task : item)),
       );
 
-      setNotice(
-        `Task status updated to ${nextStatus.replaceAll("_", " ")}.`,
-      );
+      setNotice(`Task status updated to ${nextStatus.replaceAll("_", " ")}.`);
     } catch (err) {
       if (!isCurrentScope(scope)) return;
       if (err.status === 401) {
@@ -344,9 +340,7 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
     } finally {
       endTaskMutation();
       if (isCurrentScope(scope)) {
-        setUpdatingTaskIds((current) =>
-          current.filter((id) => id !== task.id),
-        );
+        setUpdatingTaskIds((current) => current.filter((id) => id !== task.id));
       }
     }
   }
@@ -379,7 +373,9 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
       ) : (
         <select
           id="task-project"
-          disabled={saving || assigningTaskId !== null || updatingTaskIds.length > 0}
+          disabled={
+            saving || assigningTaskId !== null || updatingTaskIds.length > 0
+          }
           value={projectId}
           onChange={(event) => {
             pendingSubmission.current = null;
@@ -403,205 +399,216 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
         </p>
       )}
 
-      <h3>Create a task</h3>
+      <div className="task-columns">
+        <div className="task-create-card">
+          <span className="eyebrow">MAKE THE NEXT MOVE</span>
+          <h3>Create a task</h3>
 
-      <form className="auth-form" onSubmit={handleSubmit} noValidate>
-        <label htmlFor="task-title">
-          Title (required, max 200 characters)
-        </label>
+          <form className="auth-form" onSubmit={handleSubmit} noValidate>
+            <label htmlFor="task-title">
+              Title (required, max 200 characters)
+            </label>
 
-        <input
-          id="task-title"
-          name="title"
-          value={fields.title}
-          onChange={updateField}
-          maxLength={201}
-          required
-          aria-invalid={Boolean(fieldErrors.title)}
-          aria-describedby={
-            fieldErrors.title ? "task-title-error" : undefined
-          }
-        />
+            <input
+              id="task-title"
+              name="title"
+              value={fields.title}
+              onChange={updateField}
+              maxLength={201}
+              required
+              aria-invalid={Boolean(fieldErrors.title)}
+              aria-describedby={
+                fieldErrors.title ? "task-title-error" : undefined
+              }
+            />
 
-        {fieldErrors.title && (
-          <p id="task-title-error" className="form-error">
-            {fieldErrors.title}
-          </p>
-        )}
-
-        <label htmlFor="task-description">
-          Description (max 2000 characters)
-        </label>
-
-        <textarea
-          id="task-description"
-          name="description"
-          value={fields.description}
-          onChange={updateField}
-          maxLength={2001}
-          rows={3}
-          aria-invalid={Boolean(fieldErrors.description)}
-        />
-
-        {fieldErrors.description && (
-          <p className="form-error">{fieldErrors.description}</p>
-        )}
-
-        <label htmlFor="task-priority">Priority</label>
-
-        <select
-          id="task-priority"
-          name="priority"
-          value={fields.priority}
-          onChange={updateField}
-          required
-        >
-          <option value="LOW">Low</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="HIGH">High</option>
-          <option value="CRITICAL">Critical</option>
-        </select>
-
-        {fieldErrors.priority && (
-          <p className="form-error">{fieldErrors.priority}</p>
-        )}
-
-        <label htmlFor="task-due-date">Due date (optional)</label>
-
-        <input
-          id="task-due-date"
-          name="dueDate"
-          type="date"
-          value={fields.dueDate}
-          onChange={updateField}
-        />
-
-        {fieldErrors.dueDate && (
-          <p className="form-error">{fieldErrors.dueDate}</p>
-        )}
-
-        <label htmlFor="task-time-estimate">
-          Time estimate in hours (optional)
-        </label>
-
-        <input
-          id="task-time-estimate"
-          name="timeEstimate"
-          type="number"
-          min="0"
-          step="0.5"
-          value={fields.timeEstimate}
-          onChange={updateField}
-          aria-invalid={Boolean(fieldErrors.timeEstimate)}
-        />
-
-        {fieldErrors.timeEstimate && (
-          <p className="form-error">{fieldErrors.timeEstimate}</p>
-        )}
-
-        <button
-          type="submit"
-          disabled={
-            saving ||
-            loadingProjects ||
-            !selectedProject ||
-            selectedProject.archived
-          }
-        >
-          {saving ? "Creating..." : "Create task"}
-        </button>
-      </form>
-
-      <h3>Task list</h3>
-      {taskRefreshError && <p role="alert">{taskRefreshError}</p>}
-
-      {loadingTasks ? (
-        <p role="status">Loading tasks...</p>
-      ) : tasks.length === 0 ? (
-        <p>No tasks in this project yet.</p>
-      ) : (
-        <ul className="task-list">
-          {tasks.map((task) => {
-            const transitions = [
-              ...(allowedTransitions[task.status] || []),
-              ...(task.status === "IN_PROGRESS" &&
-              task.assigneeId == null
-                ? ["TODO"]
-                : []),
-            ];
-
-            return (
-              <li key={task.id}>
-                <strong>{task.title}</strong>
-
-                <div>
-                  <label htmlFor={`task-status-${task.id}`}>
-                    Status
-                  </label>
-
-                  <select
-                    id={`task-status-${task.id}`}
-                    aria-label={`Status for ${task.title}`}
-                    value={task.status}
-                    disabled={updatingTaskIds.includes(task.id)}
-                    onChange={(event) =>
-                      handleStatusChange(task, event.target.value)
-                    }
-                  >
-                    <option value={task.status}>
-                      {task.status.replaceAll("_", " ")}
-                    </option>
-
-                    {transitions.map((status) => (
-                      <option key={status} value={status}>
-                        {status.replaceAll("_", " ")}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <p>Priority: {task.priority}</p>
-
-                {task.description && <p>{task.description}</p>}
-
-                {task.dueDate && (
-                  <p>Due: {String(task.dueDate).slice(0, 10)}</p>
-                )}
-
-                {task.timeEstimate != null && (
-                  <p>Estimate: {task.timeEstimate} hours</p>
-                )}
-              <p>
-                Assignee: {task.assignee?.name || "Unassigned"}
+            {fieldErrors.title && (
+              <p id="task-title-error" className="form-error">
+                {fieldErrors.title}
               </p>
-              {selectedProject?.ownerId === userId && (
-                <label className="task-assignee-control">
-                  Assign to
-                  <select
-                    aria-label={`Assignee for ${task.title}`}
-                    value={task.assigneeId || ""}
-                    onChange={(event) =>
-                      handleAssigneeChange(task, event.target.value)
-                    }
-                    disabled={loadingMembers || assigningTaskId === task.id}
+            )}
+
+            <label htmlFor="task-description">
+              Description (max 2000 characters)
+            </label>
+
+            <textarea
+              id="task-description"
+              name="description"
+              value={fields.description}
+              onChange={updateField}
+              maxLength={2001}
+              rows={3}
+              aria-invalid={Boolean(fieldErrors.description)}
+            />
+
+            {fieldErrors.description && (
+              <p className="form-error">{fieldErrors.description}</p>
+            )}
+
+            <label htmlFor="task-priority">Priority</label>
+
+            <select
+              id="task-priority"
+              name="priority"
+              value={fields.priority}
+              onChange={updateField}
+              required
+            >
+              <option value="LOW">Low</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="HIGH">High</option>
+              <option value="CRITICAL">Critical</option>
+            </select>
+
+            {fieldErrors.priority && (
+              <p className="form-error">{fieldErrors.priority}</p>
+            )}
+
+            <label htmlFor="task-due-date">Due date (optional)</label>
+
+            <input
+              id="task-due-date"
+              name="dueDate"
+              type="date"
+              value={fields.dueDate}
+              onChange={updateField}
+            />
+
+            {fieldErrors.dueDate && (
+              <p className="form-error">{fieldErrors.dueDate}</p>
+            )}
+
+            <label htmlFor="task-time-estimate">
+              Time estimate in hours (optional)
+            </label>
+
+            <input
+              id="task-time-estimate"
+              name="timeEstimate"
+              type="number"
+              min="0"
+              step="0.5"
+              value={fields.timeEstimate}
+              onChange={updateField}
+              aria-invalid={Boolean(fieldErrors.timeEstimate)}
+            />
+
+            {fieldErrors.timeEstimate && (
+              <p className="form-error">{fieldErrors.timeEstimate}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={
+                saving ||
+                loadingProjects ||
+                !selectedProject ||
+                selectedProject.archived
+              }
+            >
+              {saving ? "Creating..." : "Create task"}
+            </button>
+          </form>
+        </div>
+        <div className="task-list-panel">
+          <h3>Task list</h3>
+          {taskRefreshError && <p role="alert">{taskRefreshError}</p>}
+
+          {loadingTasks ? (
+            <p role="status">Loading tasks...</p>
+          ) : tasks.length === 0 ? (
+            <p>No tasks in this project yet.</p>
+          ) : (
+            <ul className="task-list">
+              {tasks.map((task) => {
+                const transitions = [
+                  ...(allowedTransitions[task.status] || []),
+                  ...(task.status === "IN_PROGRESS" && task.assigneeId == null
+                    ? ["TODO"]
+                    : []),
+                ];
+
+                return (
+                  <li
+                    key={task.id}
+                    className="task-card"
+                    data-status={task.status}
                   >
-                    <option value="">Select a project member</option>
-                    {members.map(({ user: member }) => (
-                      <option key={member.id} value={member.id}>
-                        {member.name} ({member.email})
-                      </option>
-                    ))}
-                  </select>
-                  {assigningTaskId === task.id && (
-                    <span role="status">Saving assignment...</span>
-                  )}
-                </label>
-              )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                    <strong>{task.title}</strong>
+
+                    <div>
+                      <label htmlFor={`task-status-${task.id}`}>Status</label>
+
+                      <select
+                        id={`task-status-${task.id}`}
+                        aria-label={`Status for ${task.title}`}
+                        value={task.status}
+                        disabled={updatingTaskIds.includes(task.id)}
+                        onChange={(event) =>
+                          handleStatusChange(task, event.target.value)
+                        }
+                      >
+                        <option value={task.status}>
+                          {task.status.replaceAll("_", " ")}
+                        </option>
+
+                        {transitions.map((status) => (
+                          <option key={status} value={status}>
+                            {status.replaceAll("_", " ")}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <p
+                      className={`task-priority priority-${task.priority.toLowerCase()}`}
+                    >
+                      Priority: {task.priority}
+                    </p>
+
+                    {task.description && <p>{task.description}</p>}
+
+                    {task.dueDate && (
+                      <p>Due: {String(task.dueDate).slice(0, 10)}</p>
+                    )}
+
+                    {task.timeEstimate != null && (
+                      <p>Estimate: {task.timeEstimate} hours</p>
+                    )}
+                    <p>Assignee: {task.assignee?.name || "Unassigned"}</p>
+                    {selectedProject?.ownerId === userId && (
+                      <label className="task-assignee-control">
+                        Assign to
+                        <select
+                          aria-label={`Assignee for ${task.title}`}
+                          value={task.assigneeId || ""}
+                          onChange={(event) =>
+                            handleAssigneeChange(task, event.target.value)
+                          }
+                          disabled={
+                            loadingMembers || assigningTaskId === task.id
+                          }
+                        >
+                          <option value="">Select a project member</option>
+                          {members.map(({ user: member }) => (
+                            <option key={member.id} value={member.id}>
+                              {member.name} ({member.email})
+                            </option>
+                          ))}
+                        </select>
+                        {assigningTaskId === task.id && (
+                          <span role="status">Saving assignment...</span>
+                        )}
+                      </label>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
     </section>
   );
 }

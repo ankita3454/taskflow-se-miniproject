@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../lib/api.js";
 
-export default function ProjectPanel({ token, userId, onSessionExpired }) {
+export default function ProjectPanel({
+  token,
+  userId,
+  onSessionExpired,
+  onProjectsChanged,
+}) {
   const [name, setName] = useState("");
   const [projects, setProjects] = useState([]);
   const [invitations, setInvitations] = useState([]);
@@ -30,7 +35,9 @@ export default function ProjectPanel({ token, userId, onSessionExpired }) {
           onSessionExpired();
           return;
         }
-        setError(err instanceof ApiError ? err.message : "Could not load projects.");
+        setError(
+          err instanceof ApiError ? err.message : "Could not load projects.",
+        );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -69,12 +76,15 @@ export default function ProjectPanel({ token, userId, onSessionExpired }) {
       const { project } = await api.createProject(token, name);
       setProjects((current) => [project, ...current]);
       setName("");
+      onProjectsChanged?.();
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         onSessionExpired();
         return;
       }
-      setError(err instanceof ApiError ? err.message : "Could not create project.");
+      setError(
+        err instanceof ApiError ? err.message : "Could not create project.",
+      );
     } finally {
       setCreating(false);
     }
@@ -104,7 +114,8 @@ export default function ProjectPanel({ token, userId, onSessionExpired }) {
       }
       setInviteMessages((current) => ({
         ...current,
-        [projectId]: err instanceof ApiError ? err.message : "Could not send invitation.",
+        [projectId]:
+          err instanceof ApiError ? err.message : "Could not send invitation.",
       }));
     } finally {
       setSendingInvite(null);
@@ -117,11 +128,18 @@ export default function ProjectPanel({ token, userId, onSessionExpired }) {
     setResponding(invitationId);
 
     try {
-      const { invitation } = await api.respondToInvitation(token, invitationId, response);
-      setInvitations((current) => current.filter((item) => item.id !== invitationId));
+      const { invitation } = await api.respondToInvitation(
+        token,
+        invitationId,
+        response,
+      );
+      setInvitations((current) =>
+        current.filter((item) => item.id !== invitationId),
+      );
       if (response === "accept") {
         const { projects: updatedProjects } = await api.projects(token);
         setProjects(updatedProjects);
+        onProjectsChanged?.();
       }
       setResponseMessage(
         response === "accept"
@@ -134,7 +152,9 @@ export default function ProjectPanel({ token, userId, onSessionExpired }) {
         return;
       }
       setInvitationError(
-        err instanceof ApiError ? err.message : "Could not respond to invitation.",
+        err instanceof ApiError
+          ? err.message
+          : "Could not respond to invitation.",
       );
     } finally {
       setResponding(null);
@@ -143,7 +163,12 @@ export default function ProjectPanel({ token, userId, onSessionExpired }) {
 
   return (
     <section className="project-panel" aria-labelledby="projects-heading">
-      <h2 id="projects-heading">Your projects</h2>
+      <div className="panel-heading">
+        <h2 id="projects-heading">Your projects</h2>
+        <span className="count-label">
+          {projects.length} {projects.length === 1 ? "project" : "projects"}
+        </span>
+      </div>
 
       <form onSubmit={handleCreate} className="auth-form project-form">
         <label htmlFor="project-name">Project name</label>
@@ -173,14 +198,26 @@ export default function ProjectPanel({ token, userId, onSessionExpired }) {
             <li className="project-card" key={project.id}>
               <div className="project-summary">
                 <strong>{project.name}</strong>
-                <span>{project.archived ? "Archived" : "Active"}</span>
+                <span
+                  className={`project-state ${project.archived ? "archived" : ""}`}
+                >
+                  {project.archived ? "Archived" : "Active"}
+                </span>
               </div>
+              <p className="project-role">
+                Your role in this project:{" "}
+                <strong>
+                  {project.ownerId === userId ? "Owner" : "Member"}
+                </strong>
+              </p>
               {project.ownerId === userId && (
                 <form
                   className="invite-form"
                   onSubmit={(event) => handleInvite(event, project.id)}
                 >
-                  <label htmlFor={`invite-email-${project.id}`}>Invite by email</label>
+                  <label htmlFor={`invite-email-${project.id}`}>
+                    Invite by email
+                  </label>
                   <div className="invite-controls">
                     <input
                       id={`invite-email-${project.id}`}
@@ -195,7 +232,10 @@ export default function ProjectPanel({ token, userId, onSessionExpired }) {
                         }))
                       }
                     />
-                    <button type="submit" disabled={sendingInvite === project.id}>
+                    <button
+                      type="submit"
+                      disabled={sendingInvite === project.id}
+                    >
                       {sendingInvite === project.id ? "Sending..." : "Invite"}
                     </button>
                   </div>
@@ -210,10 +250,15 @@ export default function ProjectPanel({ token, userId, onSessionExpired }) {
           ))}
         </ul>
       ) : (
-        <p className="project-empty">You haven't created or joined a project yet.</p>
+        <p className="project-empty">
+          You haven't created or joined a project yet.
+        </p>
       )}
 
-      <section className="invitation-inbox" aria-labelledby="invitations-heading">
+      <section
+        className="invitation-inbox"
+        aria-labelledby="invitations-heading"
+      >
         <h2 id="invitations-heading">Project invitations</h2>
         {responseMessage && (
           <p role="status" className="form-status">
@@ -239,14 +284,18 @@ export default function ProjectPanel({ token, userId, onSessionExpired }) {
                   <button
                     type="button"
                     disabled={responding !== null}
-                    onClick={() => handleInvitationResponse(invitation.id, "accept")}
+                    onClick={() =>
+                      handleInvitationResponse(invitation.id, "accept")
+                    }
                   >
                     {responding === invitation.id ? "Saving..." : "Accept"}
                   </button>
                   <button
                     type="button"
                     disabled={responding !== null}
-                    onClick={() => handleInvitationResponse(invitation.id, "decline")}
+                    onClick={() =>
+                      handleInvitationResponse(invitation.id, "decline")
+                    }
                   >
                     Decline
                   </button>

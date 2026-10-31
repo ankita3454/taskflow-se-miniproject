@@ -1,0 +1,279 @@
+/* Theme-only overrides. Original light palette and application rules stay intact. */
+.theme-toggle {
+  min-height: 36px;
+  padding: 7px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+  gap: 6px;
+  background: #f1f5ef;
+  color: #294f40;
+  border: 1px solid #dce5de;
+}
+.theme-toggle:hover:not(:disabled) {
+  background: #e3edde;
+  box-shadow: none;
+}
+.auth-entry {
+  position: relative;
+}
+.auth-entry > .theme-toggle {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  color: #dce8df;
+  background: #101c18;
+  --ink: #e2f0e5;
+  --muted: #b0c4b6;
+  --green: #8ed0ad;
+  --border: #354a3e;
+  --cream: #101c18;
+}
+:root[data-theme="dark"] body {
+  background: #101c18;
+}
+[data-theme="dark"]
+  :is(
+    .topbar,
+    .shortcut-card,
+    .project-form,
+    .project-card,
+    .project-empty,
+    .task-create-card,
+    .task-card,
+    .notification-popover,
+    .notification-panel,
+    .profile-view,
+    .workspace-status,
+    .skip-link,
+    .task-list-panel > p:not([role="alert"])
+  ) {
+  background: #192a23;
+  border-color: var(--border);
+}
+[data-theme="dark"]
+  :is(
+    input,
+    select,
+    textarea,
+    .auth-entry .auth-form input,
+    .task-card > div select
+  ) {
+  background: #122219;
+  color: #e2eee4;
+  border-color: #47604e;
+}
+[data-theme="dark"] :is(input, textarea)::placeholder {
+  color: #93aa99;
+}
+[data-theme="dark"] label {
+  color: #c1d3c5;
+}
+[data-theme="dark"]
+  :is(
+    .breadcrumb,
+    .topbar-date,
+    .page-heading p,
+    .workspace-status,
+    .workspace-footer,
+    .welcome-copy p,
+    .hero-secondary,
+    .section-heading p,
+    .shortcut-card p,
+    .workspace-note p,
+    .workspace-note > a,
+    .project-form:after,
+    .project-role,
+    .invitation-card .project-summary > span,
+    .project-empty,
+    .task-card > div label,
+    .task-card > p,
+    .task-assignee-control,
+    .task-list-panel > p:not([role="alert"]),
+    .notification-heading p,
+    .notification-copy time,
+    .notification-empty p,
+    .notification-empty small,
+    .profile-identity p,
+    .auth-entry-heading > p,
+    .switch-link,
+    .auth-footnote,
+    .session-loading p
+  ) {
+  color: #b0c4b6;
+}
+[data-theme="dark"] :is(.breadcrumb strong, .notification-copy p) {
+  color: #dce8df;
+}
+[data-theme="dark"]
+  :is(
+    .eyebrow,
+    .welcome-copy .eyebrow,
+    .project-role strong,
+    .shortcut-action,
+    .notification-all-link,
+    .notification-empty h3
+  ) {
+  color: #a3c9a5;
+}
+[data-theme="dark"] button,
+[data-theme="dark"] .button {
+  background: #84cba5;
+  color: #10271b;
+}
+[data-theme="dark"] button:hover:not(:disabled),
+[data-theme="dark"] .button:hover {
+  background: #a5dfbf;
+}
+[data-theme="dark"]
+  :is(
+    .secondary-button,
+    .invitation-actions button:last-child,
+    .notification-list .read-button,
+    .theme-toggle,
+    .bell-trigger
+  ) {
+  background: #243b2d;
+  color: #c6e3cd;
+  border-color: #47604e;
+}
+[data-theme="dark"]
+  :is(
+    .secondary-button,
+    .invitation-actions button:last-child,
+    .notification-list .read-button,
+    .theme-toggle,
+    .bell-trigger
+  ):hover:not(:disabled) {
+  background: #304d39;
+}
+[data-theme="dark"] .link-button,
+[data-theme="dark"] .link-button:hover:not(:disabled) {
+  background: none;
+  color: #9edcb9;
+}
+[data-theme="dark"] .hero-actions .button {
+  background: #84cba5;
+  color: #10271b;
+}
+[data-theme="dark"] .hero-actions .button:hover {
+  background: #a5dfbf;
+}
+[data-theme="dark"] .welcome-banner {
+  background: #223a28;
+  border-color: #39523b;
+}
+[data-theme="dark"] .welcome-copy h2 span {
+  color: #a8cb94;
+}
+[data-theme="dark"] .workspace-note {
+  background: #1c3024;
+}
+[data-theme="dark"] :is(.note-icon, .mint, .notification-type-icon) {
+  background: #2b4430;
+  color: #b2d7a5;
+}
+[data-theme="dark"] .blue {
+  background: #243d44;
+  color: #a9d4e5;
+}
+[data-theme="dark"] .sand {
+  background: #443c25;
+  color: #e3cf94;
+}
+[data-theme="dark"]
+  :is(.count-label, .project-state, .task-card > .task-priority) {
+  background: #2d402b;
+  color: #c0d8a8;
+  border-color: #4b6141;
+}
+[data-theme="dark"] .project-state.archived {
+  background: #3c382a;
+  color: #d0c5a3;
+}
+[data-theme="dark"] .task-card > .priority-high,
+[data-theme="dark"] .task-card > .priority-critical {
+  background: #463426;
+  color: #e8bf8f;
+}
+[data-theme="dark"] .task-card > .priority-low {
+  background: #24402e;
+  color: #add6b9;
+}
+[data-theme="dark"] .notification-list li.is-unread {
+  background: #243b2a;
+}
+[data-theme="dark"] .bell-count {
+  background: #a9d58f;
+  color: #12271a;
+  border-color: #192a23;
+}
+[data-theme="dark"]
+  :is(
+    .shortcut-action,
+    .invite-form,
+    .task-assignee-control,
+    .notification-heading,
+    .notification-list li,
+    .profile-view > .meta
+  ) {
+  border-color: var(--border);
+}
+[data-theme="dark"] .form-status {
+  background: #203d2a;
+  color: #bce6c5;
+  border-color: #416b4d;
+}
+[data-theme="dark"] :is(.form-error, [role="alert"]) {
+  background: #422b2d;
+  color: #ffcbc6;
+  border-color: #785050;
+}
+[data-theme="dark"] .profile-view .logout-button {
+  background: #3c2d29;
+  color: #ecc2af;
+  border-color: #6b4d43;
+}
+[data-theme="dark"] .profile-view .logout-button:hover {
+  background: #513b33;
+}
+[data-theme="dark"] :is(.auth-layout, .session-loading) {
+  background: #101c18;
+}
+[data-theme="dark"] :is(.sidebar, .auth-story) {
+  background: #112e24;
+}
+/* Illustrations remain deliberately two-tone; they are decorative, not forms. */
+[data-theme="dark"] .flow-plan,
+[data-theme="dark"] .flow-done {
+  background: #dce6ce;
+  color: #385338;
+  border-color: #cddcbd;
+}
+[data-theme="dark"] .flow-work {
+  background: #306447;
+  color: #edf7de;
+  border-color: #4d7855;
+}
+@media (max-width: 700px) {
+  .topbar-actions {
+    gap: 10px;
+  }
+  .theme-toggle {
+    padding: 7px 9px;
+  }
+  .auth-entry > .theme-toggle {
+    top: 16px;
+    right: 18px;
+  }
+}
+@media (max-width: 380px) {
+  .topbar-actions {
+    gap: 7px;
+  }
+  .theme-toggle span {
+    display: none;
+  }
+}

@@ -108,34 +108,46 @@ before(async () => {
 
   task = await makeTask();
 });
-
 after(async () => {
-  if (project) {
-    await prisma.task.deleteMany({
-      where: { projectId: project.id },
+    if (project) {
+      const projectTasks = await prisma.task.findMany({
+        where: { projectId: project.id },
+        select: { id: true },
+      });
+
+      await prisma.activityLog.deleteMany({
+        where: {
+          taskId: {
+            in: projectTasks.map((task) => task.id),
+          },
+        },
+      });
+
+      await prisma.task.deleteMany({
+        where: { projectId: project.id },
+      });
+
+      await prisma.projectMember.deleteMany({
+        where: { projectId: project.id },
+      });
+
+      await prisma.project.deleteMany({
+        where: { id: project.id },
+      });
+    }
+
+    await prisma.user.deleteMany({
+      where: { email: { startsWith: `task-edit-${RUN_ID}-` } },
     });
 
-    await prisma.projectMember.deleteMany({
-      where: { projectId: project.id },
-    });
+    if (server) {
+      await new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
+    }
 
-    await prisma.project.deleteMany({
-      where: { id: project.id },
-    });
-  }
-
-  await prisma.user.deleteMany({
-    where: { email: { startsWith: `task-edit-${RUN_ID}-` } },
+    await prisma.$disconnect();
   });
-
-  if (server) {
-    await new Promise((resolve, reject) => {
-      server.close((error) => (error ? reject(error) : resolve()));
-    });
-  }
-
-  await prisma.$disconnect();
-});
 
 describe("Issue #6: Authorised Task Editing", () => {
   test("the project Owner can update task details", async () => {
@@ -162,6 +174,35 @@ describe("Issue #6: Authorised Task Editing", () => {
     assert.equal(saved.priority, "HIGH");
     assert.equal(saved.dueDate.toISOString().slice(0, 10), "2027-01-15");
     assert.equal(saved.timeEstimate, 3.5);
+    // Verify activity logs were created for every changed field.
+    const logs = await prisma.activityLog.findMany({
+      where: { taskId: task.id },
+      orderBy: { field: "asc" },
+    });
+
+    assert.equal(logs.length, 5);
+
+    const expectedChanges = {
+      title: ["Original task", "Updated task"],
+      description: ["Original description", "Updated description"],
+      priority: ["MEDIUM", "HIGH"],
+      dueDate: [null, "2027-01-15"],
+      timeEstimate: [null, 3.5],
+    };
+
+    for (const log of logs) {
+      assert.equal(log.actorId, users.owner.id);
+      assert.ok(log.createdAt instanceof Date);
+      assert.ok(!Number.isNaN(log.createdAt.getTime()));
+
+      assert.ok(Object.hasOwn(expectedChanges, log.field));
+      assert.deepEqual(log.oldValue, expectedChanges[log.field][0]);
+      assert.deepEqual(log.newValue, expectedChanges[log.field][1]);
+
+      delete expectedChanges[log.field];
+    }
+
+    assert.deepEqual(expectedChanges, {});
   });
 
   test("a project Member cannot edit task details", async () => {
@@ -198,9 +239,13 @@ describe("Issue #6: Authorised Task Editing", () => {
 
     assert.equal(response.status, 401);
   });
-
-  test("an invalid title is rejected without changing the task", async () => {
+  test("an invalid title is rejected without changing the task or creating an activity log", async () => {
     const beforeTask = await readTask();
+
+    // Count existing logs before the rejected update.
+    const logsBefore = await prisma.activityLog.count({
+      where: { taskId: task.id },
+    });
 
     const response = await call(`/api/v1/tasks/${task.id}`, {
       method: "PATCH",
@@ -210,6 +255,13 @@ describe("Issue #6: Authorised Task Editing", () => {
 
     assert.equal(response.status, 400);
     assert.equal((await readTask()).title, beforeTask.title);
+
+    // A rejected update must not create an activity log.
+    const logsAfter = await prisma.activityLog.count({
+      where: { taskId: task.id },
+    });
+
+    assert.equal(logsAfter, logsBefore);
   });
 
   test("a title exceeding 200 characters is rejected", async () => {

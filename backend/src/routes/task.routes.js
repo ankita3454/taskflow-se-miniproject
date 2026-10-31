@@ -25,7 +25,9 @@ function handle(fn) {
           error: {
             code: error.code,
             message: error.message,
-            ...(Object.keys(error.fields).length ? { fields: error.fields } : {}),
+            ...(Object.keys(error.fields).length
+              ? { fields: error.fields }
+              : {}),
           },
         });
       }
@@ -49,11 +51,11 @@ router.post(
   requireProjectMember(),
   handle(async (req, res) => {
     const task = await createTask({
-  body: req.body,
-  userId: req.user.id,
-  projectAccess: req.projectAccess,
-  idempotencyKey: req.get("Idempotency-Key"),
-  });
+      body: req.body,
+      userId: req.user.id,
+      projectAccess: req.projectAccess,
+      idempotencyKey: req.get("Idempotency-Key"),
+    });
 
     res.status(201).json({ task });
   }),
@@ -69,6 +71,7 @@ router.get(
     res.status(200).json({ tasks });
   }),
 );
+
 // PATCH /api/v1/tasks/:taskId/status
 // Only the task assignee or project Owner may change status.
 router.patch(
@@ -79,11 +82,13 @@ router.patch(
     const task = await changeTaskStatus({
       taskId: req.params.taskId,
       status: req.body?.status,
+      userId: req.user.id,
     });
 
     res.status(200).json({ task });
   }),
 );
+
 /**
  * PATCH /api/v1/tasks/:taskId
  * Only the Project Owner can edit task details.
@@ -97,6 +102,7 @@ router.patch(
     const task = await updateTask({
       taskId: req.task.id,
       body: req.body,
+      userId: req.user.id,
     });
 
     res.status(200).json({ task });

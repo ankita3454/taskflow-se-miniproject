@@ -48,11 +48,17 @@ function enterTitle(title) {
 }
 
 async function submitTask() {
-  fireEvent.click(screen.getByRole("button", { name: /create task/i }));
+  // Await the ready UI, not just a mock call being started. Flush React's
+  // asynchronous effects and the mutation response before the next action.
+  const button = await screen.findByRole("button", { name: /create task/i });
+  await waitFor(() => expect(button).toBeEnabled());
+  await act(async () => {
+    fireEvent.click(button);
+  });
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
 
   let keyNumber = 0;
   vi.stubGlobal("crypto", {
@@ -137,6 +143,11 @@ describe("TaskWorkspace idempotency", () => {
 
     await waitFor(() => {
       expect(api.createTask).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/title/i)).toHaveValue("");
+      expect(screen.getByRole("button", { name: /create task/i })).toBeEnabled();
     });
 
     // The form resets after success; entering the same title again
@@ -425,5 +436,30 @@ describe("TaskWorkspace background synchronization", () => {
     view.unmount();
     await poll();
     expect(api.projectTasks).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe("Task creation completion timing", () => {
+  it("waits for a delayed successful submission before starting a separate submission", async () => {
+    let finishFirst;
+    api.createTask
+      .mockImplementationOnce(() => new Promise(resolve => { finishFirst = resolve; }))
+      .mockResolvedValueOnce({ task: createdTask("Delayed task", "delayed-2") });
+    await act(async () => {
+      render(<TaskWorkspace token="test-token" onSessionExpired={vi.fn()} />);
+    });
+    enterTitle("Delayed task");
+    await submitTask();
+    expect(screen.getByRole("button", { name: /creating/i })).toBeDisabled();
+    expect(api.createTask).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      finishFirst({ task: createdTask("Delayed task", "delayed-1") });
+    });
+    expect(screen.getByLabelText(/title/i)).toHaveValue("");
+    enterTitle("Delayed task");
+    await submitTask();
+    expect(api.createTask).toHaveBeenCalledTimes(2);
+    expect(api.createTask.mock.calls.map(call => call[2])).toEqual(["test-key-1", "test-key-2"]);
   });
 });

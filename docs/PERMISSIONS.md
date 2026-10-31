@@ -23,11 +23,19 @@ role is `OWNER` or `ADMIN` has no access to a project they aren't part of.
 | Any protected endpoint | A logged-in, active user | `requireAuth` | 401 |
 | View a project, create tasks in it | Members of that project (incl. its Owner) | `requireProjectMember()` | 403 |
 | Invite, remove or change a member's project role | That project's Owner | `requireProjectOwner()` | 403 |
+| Accept or decline a project invitation | The user whose e-mail matches the invitation | Invitation service ownership check | 403 |
 | Archive a project | That project's Owner | `requireProjectOwner()` | 403 |
 | View a task | Members of the task's project | `requireTaskMember()` | 403 |
 | Assign or reassign a task | The Owner of the task's project | `requireTaskProjectOwner()` | 403 |
 | Change a task's status | The task's assignee (while still a project member), or the Owner of its project | `requireTaskStatusChange()` | 403 |
 | Deactivate/reactivate a user, change a system role, user management, audit log | Administrators | `requireRole("ADMIN")` | 403 |
+| Edit task title, description, priority, due date or time estimate | Only the Owner of the task's project, before the task reaches Done | `requireTaskProjectOwner()` plus the task update service's completion check | 403 for non-Owners; 409 for completed tasks |
+
+Task detail editing and status changes are separate permissions. The task's
+creator and assignee do not gain permission to edit task details merely from
+those relationships. Only the Project Owner may edit task details, and only
+before the task reaches Done. Status transitions follow the separate
+`requireTaskStatusChange()` rule.
 
 An unknown or malformed project/task ID returns 404. A rejected request
 never reaches the route handler, so nothing is changed.
@@ -73,6 +81,10 @@ access, the single-Owner rule, task-status and assignment permissions
 (including assignees removed from the project), Admin-only actions, and
 immediate role changes and deactivation. Run with `npm test`; CI runs it on
 every push.
+
+`backend/tests/invitations.test.js` covers Owner-only invitation creation,
+invitee inbox visibility, invitation response ownership, acceptance with
+Member membership, and declining without membership.
 
 ## Not covered here
 

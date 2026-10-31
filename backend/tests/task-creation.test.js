@@ -34,8 +34,12 @@ async function makeUser(label) {
   return user;
 }
 
-async function call(path, { method = "GET", body, as } = {}) {
-  const headers = { "Content-Type": "application/json" };
+
+async function call(path, { method = "GET", body, as, headers: extraHeaders = {} } = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...extraHeaders,
+  };
 
   if (as) {
     headers.Authorization = `Bearer ${tokens[as]}`;
@@ -107,6 +111,11 @@ after(async () => {
   const projectIds = [project?.id, archivedProject?.id].filter(Boolean);
 
   if (projectIds.length) {
+    await prisma.taskCreationRequest.deleteMany({
+  where: {
+    userId: { in: Object.values(users).map((user) => user.id) },
+    },
+  });
     await prisma.task.deleteMany({
       where: { projectId: { in: projectIds } },
     });
@@ -134,7 +143,7 @@ after(async () => {
 });
 
 describe("Issue #5: Task Creation API", () => {
-  test("a project member can create a task with default TODO status", async () => {
+  test("a project member can create a task with default status TODO", async () => {
     const response = await call("/api/v1/tasks", {
       method: "POST",
       body: validTask(),
@@ -149,15 +158,15 @@ describe("Issue #5: Task Creation API", () => {
     assert.equal(response.body.task.assigneeId, null);
   });
 
-  test("an authenticated project Owner can create a task", async () => {
+  test("an invalid assignee UUID is rejected with 400", async () => {
     const response = await call("/api/v1/tasks", {
       method: "POST",
-      body: validTask({ title: "Owner-created task" }),
+      body: validTask({ assigneeId: "not-a-uuid" }),
       as: "owner",
     });
 
-    assert.equal(response.status, 201);
-    assert.equal(response.body.task.title, "Owner-created task");
+    assert.equal(response.status, 400);
+    assert.equal(response.body.error.code, "VALIDATION_ERROR");
   });
 
   test("an unauthenticated request is rejected", async () => {
@@ -267,5 +276,98 @@ describe("Issue #5: Task Creation API", () => {
         (task) => task.id === created.body.task.id,
       ),
     );
+  });
+  test("retrying with the same key and payload returns the same task", async () => {
+    const key = randomUUID();
+    const body = validTask({ title: "Idempotent task" });
+
+    const first = await call("/api/v1/tasks", {
+      method: "POST",
+      body,
+      as: "member",
+      headers: { "Idempotency-Key": key },
+    });
+
+    const retry = await call("/api/v1/tasks", {
+      method: "POST",
+      body,
+      as: "member",
+      headers: { "Idempotency-Key": key },
+    });
+
+    assert.equal(first.status, 201);
+    assert.equal(retry.status, 201);
+    assert.equal(retry.body.task.id, first.body.task.id);
+
+    const count = await prisma.task.count({
+      where: { projectId: project.id, title: "Idempotent task" },
+    });
+    assert.equal(count, 1);
+  });
+
+  test("reusing a key with a different payload returns 409", async () => {
+    const key = randomUUID();
+
+    const first = await call("/api/v1/tasks", {
+      method: "POST",
+      body: validTask({ title: "Original payload" }),
+      as: "member",
+      headers: { "Idempotency-Key": key },
+    });
+
+    const conflict = await call("/api/v1/tasks", {
+      method: "POST",
+      body: validTask({ title: "Changed payload" }),
+      as: "member",
+      headers: { "Idempotency-Key": key },
+    });
+
+    assert.equal(first.status, 201);
+    assert.equal(conflict.status, 409);
+    assert.equal(conflict.body.error.code, "IDEMPOTENCY_KEY_CONFLICT");
+  });
+
+  test("concurrent requests with the same key create only one task", async () => {
+    const key = randomUUID();
+    const body = validTask({ title: "Concurrent idempotent task" });
+
+    const responses = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        call("/api/v1/tasks", {
+          method: "POST",
+          body,
+          as: "member",
+          headers: { "Idempotency-Key": key },
+        }),
+      ),
+    );
+
+    assert.ok(
+      responses.every((response) => response.status === 201),
+      JSON.stringify(responses.map((response) => ({
+        status: response.status,
+        body: response.body,
+      }))),
+    );
+
+    const taskIds = new Set(responses.map((response) => response.body.task.id));
+    assert.equal(taskIds.size, 1);
+
+    const count = await prisma.task.count({
+      where: { projectId: project.id, title: "Concurrent idempotent task" },
+    });
+    assert.equal(count, 1);
+  });
+
+  test("an empty idempotency key is rejected with 400", async () => {
+    const response = await call("/api/v1/tasks", {
+      method: "POST",
+      body: validTask(),
+      as: "member",
+      headers: { "Idempotency-Key": " " },
+    });
+
+    assert.equal(response.status, 400);
+    assert.equal(response.body.error.code, "VALIDATION_ERROR");
   });
 });

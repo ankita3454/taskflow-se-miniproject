@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api, ApiError } from "../lib/api.js";
+import ProjectPanel from "./ProjectPanel.jsx";
 
 export default function ProfileView({
   token,
@@ -93,6 +94,8 @@ export default function ProfileView({
           {saving ? "Saving..." : "Save changes"}
         </button>
       </form>
+
+      <ProjectPanel token={token} userId={user.id} onSessionExpired={onSessionExpired} />
 
       <button
         type="button"

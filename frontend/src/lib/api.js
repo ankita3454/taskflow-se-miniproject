@@ -10,15 +10,21 @@ class ApiError extends Error {
   }
 }
 
-async function request(path, { method = "GET", body, token } = {}) {
-  const headers = { "Content-Type": "application/json" };
+async function request(
+  path,
+  { method = "GET", body, token, extraHeaders = {} } = {},
+) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...extraHeaders,
+  };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
 
   if (response.status === 204) return null;
 
@@ -55,13 +61,45 @@ export const api = {
   projectMembers: (projectId, token) =>
     request(`/projects/${encodeURIComponent(projectId)}/members`, { token }),
 
-  createTask: (fields, token) =>
-    request("/tasks", { method: "POST", body: fields, token }),
+  createTask: (fields, token, idempotencyKey) =>
+    request("/tasks", {
+      method: "POST",
+      body: fields,
+      token,
+      extraHeaders: {
+        "Idempotency-Key": idempotencyKey,
+      },
+    }),
+
+  changeTaskStatus: (taskId, status, token) =>
+    request(`/tasks/${encodeURIComponent(taskId)}/status`, {
+      method: "PATCH",
+      body: { status },
+      token,
+    }),
 
   assignTask: (taskId, assigneeId, token) =>
     request(`/tasks/${encodeURIComponent(taskId)}/assignee`, {
       method: "PATCH",
       body: { assigneeId },
+      token,
+    }),
+
+  createProject: (token, name) =>
+    request("/projects", { method: "POST", body: { name }, token }),
+
+  invitations: (token) => request("/invitations", { token }),
+
+  inviteMember: (token, projectId, email) =>
+    request(`/projects/${projectId}/invitations`, {
+      method: "POST",
+      body: { email },
+      token,
+    }),
+
+  respondToInvitation: (token, invitationId, response) =>
+    request(`/invitations/${invitationId}/${response}`, {
+      method: "POST",
       token,
     }),
 };

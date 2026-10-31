@@ -21,11 +21,14 @@ model User {
   role         UserRole @default(MEMBER)
   active       Boolean  @default(true)
 
-  ownedProjects Project[]       @relation("ProjectOwner")
-  memberships   ProjectMember[]
+  ownedProjects   Project[]           @relation("ProjectOwner")
+  memberships     ProjectMember[]
+  sentInvitations ProjectInvitation[] @relation("ProjectInvitationSender")
 
-  assignedTasks Task[]         @relation("TaskAssignee")
+  assignedTasks        Task[]                @relation("TaskAssignee")
   notifications Notification[]
+  taskCreationRequests TaskCreationRequest[]
+  activityLogs         ActivityLog[]
 
   @@map("users")
 }
@@ -36,9 +39,10 @@ model Project {
   ownerId  String  @map("owner_id") @db.Uuid
   archived Boolean @default(false)
 
-  owner   User            @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  members ProjectMember[]
-  tasks   Task[]
+  owner       User                @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  members     ProjectMember[]
+  invitations ProjectInvitation[]
+  tasks       Task[]
 
   @@unique([ownerId, name])
   @@map("projects")
@@ -54,6 +58,29 @@ model ProjectMember {
 
   @@id([projectId, userId])
   @@map("project_members")
+}
+
+enum InvitationStatus {
+  PENDING  @map("Pending")
+  ACCEPTED @map("Accepted")
+  DECLINED @map("Declined")
+}
+
+model ProjectInvitation {
+  id           String           @id @default(uuid()) @map("invitation_id") @db.Uuid
+  projectId    String           @map("project_id") @db.Uuid
+  invitedEmail String           @map("invited_email") @db.VarChar(150)
+  invitedById  String           @map("invited_by") @db.Uuid
+  status       InvitationStatus @default(PENDING)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  respondedAt  DateTime?        @map("responded_at") @db.Timestamptz(3)
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  invitedBy User    @relation("ProjectInvitationSender", fields: [invitedById], references: [id], onDelete: Restrict)
+
+  @@index([invitedEmail, status])
+  @@index([projectId, status])
+  @@map("project_invitations")
 }
 
 enum TaskPriority {
@@ -82,13 +109,48 @@ model Task {
   assigneeId   String?      @map("assignee_id") @db.Uuid
   createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  project       Project        @relation(fields: [projectId], references: [id], onDelete: Restrict)
-  assignee      User?          @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  assignee User?   @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: Restrict)
+
   notifications Notification[]
+  creationRequest TaskCreationRequest?
+  activityLogs    ActivityLog[]
 
   @@index([projectId, status])
   @@index([assigneeId])
   @@map("tasks")
+}
+
+model TaskCreationRequest {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  key         String   @db.VarChar(255)
+  payloadHash String   @map("payload_hash") @db.VarChar(64)
+  taskId      String?  @unique @map("task_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@map("task_creation_requests")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @map("task_id") @db.Uuid
+  actorId   String   @map("actor_id") @db.Uuid
+  field     String   @db.VarChar(50)
+  oldValue  Json?    @map("old_value")
+  newValue  Json?    @map("new_value")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  task  Task @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  actor User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([taskId, createdAt])
+  @@index([actorId])
+  @@map("activity_logs")
 }
 
 model Notification {

@@ -8,9 +8,13 @@ const UUID_PATTERN =
 export function createNotificationService(
   repository = notificationRepository,
 ) {
-  async function notifyTaskAssigned(taskId, db) {
+  async function notifyTaskAssigned(taskId, db, actorId) {
     if (typeof taskId !== "string" || !UUID_PATTERN.test(taskId)) {
       throw new Error("A valid task ID is required");
+    }
+
+    if (typeof actorId !== "string" || !UUID_PATTERN.test(actorId)) {
+      throw new Error("A valid actor ID is required");
     }
 
     const task = await repository.findNotificationTask(taskId, db);
@@ -20,7 +24,7 @@ export function createNotificationService(
     }
 
     // An unassigned task has no recipient.
-    if (!task.assigneeId) {
+    if (!task.assigneeId || task.assigneeId === actorId) {
       return null;
     }
 
@@ -29,8 +33,7 @@ export function createNotificationService(
       task.assigneeId,
       db,
     );
-
-    if (!membership) {
+    if (!membership && task.project?.ownerId !== task.assigneeId) {
       throw new Error("Task assignee is not a project member");
     }
 
@@ -45,9 +48,9 @@ export function createNotificationService(
     );
   }
 
-    // Call after the task status has been updated.
+  // Call after the task status has been updated.
   // Pass the status that existed before the update.
-  async function notifyTaskStatusChanged(taskId, previousStatus, db) {
+  async function notifyTaskStatusChanged(taskId, previousStatus, db, actorId) {
     const validStatuses = [
       "TODO",
       "IN_PROGRESS",
@@ -61,6 +64,10 @@ export function createNotificationService(
 
     if (!validStatuses.includes(previousStatus)) {
       throw new Error("A valid previous task status is required");
+    }
+
+    if (typeof actorId !== "string" || !UUID_PATTERN.test(actorId)) {
+      throw new Error("A valid actor ID is required");
     }
 
     const task = await repository.findNotificationTask(taskId, db);
@@ -78,14 +85,27 @@ export function createNotificationService(
       return null;
     }
 
-    const membership = await repository.findProjectMembership(
-      task.projectId,
-      task.assigneeId,
-      db,
-    );
+    const ownerId = task.project?.ownerId;
+    if (typeof ownerId !== "string" || !UUID_PATTERN.test(ownerId)) {
+      throw new Error("Task project Owner is missing");
+    }
+    let recipientId;
+    if (actorId === ownerId) {
+      recipientId = task.assigneeId;
+    } else if (actorId === task.assigneeId) {
+      recipientId = ownerId;
+    } else {
+      throw new Error("Status actor must be the assignee or project Owner");
+    }
+    if (recipientId === actorId) return null;
 
-    if (!membership) {
-      throw new Error("Task assignee is not a project member");
+    // The Owner may update a task whose previous assignee has left the project,
+    // but the removed assignee must not receive new project information.
+    if (recipientId !== ownerId) {
+      const membership = await repository.findProjectMembership(
+        task.projectId, recipientId, db,
+      );
+      if (!membership) return null;
     }
 
     const statusLabels = {
@@ -97,7 +117,7 @@ export function createNotificationService(
 
     return repository.createNotification(
       {
-        userId: task.assigneeId,
+        userId: recipientId,
         taskId: task.id,
         type: "TASK_STATUS_CHANGED",
         body: `Task "${task.title}" changed from ${statusLabels[previousStatus]} to ${statusLabels[task.status]}.`,
@@ -106,7 +126,7 @@ export function createNotificationService(
     );
   }
 
-    // Called by the comment service after detecting mentioned user IDs.
+  // Called by the comment service after detecting mentioned user IDs.
   async function notifyTaskMentioned(taskId, mentionedUserIds, db) {
     if (typeof taskId !== "string" || !UUID_PATTERN.test(taskId)) {
       throw new Error("A valid task ID is required");

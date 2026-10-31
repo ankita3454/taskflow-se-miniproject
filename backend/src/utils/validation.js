@@ -5,6 +5,7 @@
 // email VarChar(150)), so oversized input is a 400 instead of a database 500.
 export const NAME_MAX = 100;
 export const EMAIL_MAX = 150;
+export const PROJECT_NAME_MAX = 150;
 export const PASSWORD_MIN = 8;
 // bcrypt only uses the first 72 bytes of a password, so anything longer
 // would be silently truncated. Reject it instead.
@@ -30,6 +31,16 @@ export function validateName(value) {
   }
   if (value.trim().length > NAME_MAX) {
     return `Name must be at most ${NAME_MAX} characters`;
+  }
+  return null;
+}
+
+export function validateProjectName(value) {
+  if (typeof value !== "string" || value.trim() === "") {
+    return "Project name is required";
+  }
+  if ([...value.trim()].length > PROJECT_NAME_MAX) {
+    return `Project name must be at most ${PROJECT_NAME_MAX} characters`;
   }
   return null;
 }

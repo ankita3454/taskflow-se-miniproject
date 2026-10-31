@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api.js";
 
 export default function NotificationBell({ token, onSessionExpired }) {
@@ -7,6 +7,9 @@ export default function NotificationBell({ token, onSessionExpired }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const mutationVersion = useRef(0);
+  const mutationPending = useRef(false);
 
   const unreadCount = notifications.filter(
     (notification) => !notification.isRead,
@@ -21,9 +24,11 @@ export default function NotificationBell({ token, onSessionExpired }) {
       let sessionExpired = false;
 
       try {
+        if (mutationPending.current) return;
+        const version = mutationVersion.current;
         const data = await api.listNotifications(token);
 
-        if (!cancelled) {
+        if (!cancelled && !mutationPending.current && version === mutationVersion.current) {
           setNotifications(data.notifications);
           setError("");
         }
@@ -56,6 +61,8 @@ export default function NotificationBell({ token, onSessionExpired }) {
   }, [token, onSessionExpired]);
 
   async function handleMarkRead(notificationId) {
+    mutationVersion.current += 1;
+    mutationPending.current = true;
     setBusy(true);
     setError("");
 
@@ -76,11 +83,14 @@ export default function NotificationBell({ token, onSessionExpired }) {
         setError("Could not mark the notification as read. Please retry.");
       }
     } finally {
+      mutationPending.current = false;
       setBusy(false);
     }
   }
 
   async function handleMarkAllRead() {
+    mutationVersion.current += 1;
+    mutationPending.current = true;
     setBusy(true);
     setError("");
 
@@ -97,6 +107,7 @@ export default function NotificationBell({ token, onSessionExpired }) {
         setError("Could not refresh read status. Please retry.");
       }
     } finally {
+      mutationPending.current = false;
       setBusy(false);
     }
   }

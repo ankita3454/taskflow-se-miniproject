@@ -114,7 +114,7 @@ describe("Notification database integration", () => {
 
   test("saves an assignment notification", async () => {
     const notification = await notificationService.notifyTaskAssigned(
-      fixture.task.id,
+      fixture.task.id, undefined, fixture.owner.id,
     );
 
     await expectStored(notification, "TASK_ASSIGNED");
@@ -130,7 +130,7 @@ describe("Notification database integration", () => {
       return notificationService.notifyTaskStatusChanged(
         fixture.task.id,
         "TODO",
-        db,
+        db, fixture.owner.id,
       );
     });
 

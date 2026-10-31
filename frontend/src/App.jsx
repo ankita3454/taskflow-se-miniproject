@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import { api } from "./lib/api.js";
 import LoginForm from "./components/LoginForm.jsx";
 import RegisterForm from "./components/RegisterForm.jsx";
 import ProfileView from "./components/ProfileView.jsx";
 import NotificationBell from "./components/NotificationBell.jsx";
+import TaskWorkspace from "./components/TaskWorkspace.jsx";
 
 const TOKEN_STORAGE_KEY = "taskflow.token";
 const SESSION_EXPIRED_NOTICE = "Your session has expired. Please log in again.";
@@ -56,19 +57,19 @@ export default function App() {
     setUser(newUser);
   }
 
-  function handleLogout() {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     setToken(null);
     setUser(null);
     setAuthView("login");
-  }
+  }, []);
 
   // A protected request came back 401 (expired or invalid JWT): end the
   // session and send the user back to the login form (issue #2).
-  function handleSessionExpired() {
+  const handleSessionExpired = useCallback(() => {
     handleLogout();
     setNotice(SESSION_EXPIRED_NOTICE);
-  }
+  }, [handleLogout]);
 
   if (restoringSession) {
     return (
@@ -83,21 +84,22 @@ export default function App() {
     <main>
       <h1>TaskFlow</h1>
 
-      {token && user ? (
-      <>
-        <NotificationBell
-        key={user.id}
-        token={token}
-        onSessionExpired={handleSessionExpired}
-      />
-        <ProfileView
-          token={token}
-          user={user}
-          onUserUpdated={setUser}
-          onLogout={handleLogout}
-          onSessionExpired={handleSessionExpired}
-        />
-      </>
+ {token && user ? (
+  <>
+    <NotificationBell key={user.id} token={token} onSessionExpired={handleSessionExpired} />
+    <ProfileView
+      token={token}
+      user={user}
+      onUserUpdated={setUser}
+      onLogout={handleLogout}
+      onSessionExpired={handleSessionExpired}
+    />
+    <TaskWorkspace
+      token={token}
+      userId={user.id}
+      onSessionExpired={handleSessionExpired}
+    />
+  </>
       ) : authView === "login" ? (
         <LoginForm
           notice={notice}

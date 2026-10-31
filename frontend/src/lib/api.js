@@ -2,22 +2,29 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api/v1";
 
 class ApiError extends Error {
-  constructor(status, code, message) {
+  constructor(status, code, message, fields = {}) {
     super(message);
     this.status = status;
     this.code = code;
+    this.fields = fields;
   }
 }
 
-async function request(path, { method = "GET", body, token } = {}) {
-  const headers = { "Content-Type": "application/json" };
+async function request(
+  path,
+  { method = "GET", body, token, extraHeaders = {} } = {},
+) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...extraHeaders,
+  };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
 
   if (response.status === 204) return null;
 
@@ -29,6 +36,7 @@ async function request(path, { method = "GET", body, token } = {}) {
       response.status,
       err.code || "UNKNOWN",
       err.message || "Something went wrong. Please try again.",
+      err.fields || {},
     );
   }
 
@@ -45,6 +53,55 @@ export const api = {
   updateMe: (token, fields) =>
     request("/auth/me", { method: "PATCH", body: fields, token }),
 
+  projects: (token) => request("/projects", { token }),
+
+  projectTasks: (projectId, token) =>
+    request(`/projects/${encodeURIComponent(projectId)}/tasks`, { token }),
+
+  projectMembers: (projectId, token) =>
+    request(`/projects/${encodeURIComponent(projectId)}/members`, { token }),
+
+  createTask: (fields, token, idempotencyKey) =>
+    request("/tasks", {
+      method: "POST",
+      body: fields,
+      token,
+      extraHeaders: {
+        "Idempotency-Key": idempotencyKey,
+      },
+    }),
+
+  changeTaskStatus: (taskId, status, token) =>
+    request(`/tasks/${encodeURIComponent(taskId)}/status`, {
+      method: "PATCH",
+      body: { status },
+      token,
+    }),
+
+  assignTask: (taskId, assigneeId, token) =>
+    request(`/tasks/${encodeURIComponent(taskId)}/assignee`, {
+      method: "PATCH",
+      body: { assigneeId },
+      token,
+    }),
+
+  createProject: (token, name) =>
+    request("/projects", { method: "POST", body: { name }, token }),
+
+  invitations: (token) => request("/invitations", { token }),
+
+  inviteMember: (token, projectId, email) =>
+    request(`/projects/${projectId}/invitations`, {
+      method: "POST",
+      body: { email },
+      token,
+    }),
+
+  respondToInvitation: (token, invitationId, response) =>
+    request(`/invitations/${invitationId}/${response}`, {
+      method: "POST",
+      token,
+    }),
     listNotifications: (token) =>
     request("/notifications", { token }),
 

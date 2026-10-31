@@ -26,6 +26,7 @@ export async function findNotificationTask(taskId, db = prisma) {
       projectId: true,
       assigneeId: true,
       status: true,
+      project: { select: { ownerId: true } },
     },
   });
 }

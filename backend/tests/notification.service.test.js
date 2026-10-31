@@ -3,6 +3,7 @@ import { createNotificationService } from "../src/services/notification.service.
 
 const TASK_ID = "11111111-1111-4111-8111-111111111111";
 const USER_ID = "22222222-2222-4222-8222-222222222222";
+const OWNER_ID = "55555555-5555-4555-8555-555555555555";
 const PROJECT_ID = "33333333-3333-4333-8333-333333333333";
 
 describe("Assignment notifications", () => {
@@ -38,7 +39,7 @@ describe("Assignment notifications", () => {
 
     repository.createNotification.mockResolvedValue(savedNotification);
 
-    const result = await service.notifyTaskAssigned(TASK_ID);
+    const result = await service.notifyTaskAssigned(TASK_ID, undefined, OWNER_ID);
 
     expect(repository.findNotificationTask).toHaveBeenCalledWith(
       TASK_ID,
@@ -66,7 +67,7 @@ describe("Assignment notifications", () => {
 
   test("rejects an invalid task ID without querying the database", async () => {
     await expect(
-      service.notifyTaskAssigned("invalid-id"),
+      service.notifyTaskAssigned("invalid-id", undefined, OWNER_ID),
     ).rejects.toThrow("A valid task ID is required");
 
     expect(repository.findNotificationTask).not.toHaveBeenCalled();
@@ -77,7 +78,7 @@ describe("Assignment notifications", () => {
     repository.findNotificationTask.mockResolvedValue(null);
 
     await expect(
-      service.notifyTaskAssigned(TASK_ID),
+      service.notifyTaskAssigned(TASK_ID, undefined, OWNER_ID),
     ).rejects.toThrow("Task not found");
 
     expect(repository.createNotification).not.toHaveBeenCalled();
@@ -91,7 +92,7 @@ describe("Assignment notifications", () => {
     });
 
     await expect(
-      service.notifyTaskAssigned(TASK_ID),
+      service.notifyTaskAssigned(TASK_ID, undefined, OWNER_ID),
     ).resolves.toBeNull();
 
     expect(repository.findProjectMembership).not.toHaveBeenCalled();
@@ -108,7 +109,7 @@ describe("Assignment notifications", () => {
     repository.findProjectMembership.mockResolvedValue(null);
 
     await expect(
-      service.notifyTaskAssigned(TASK_ID),
+      service.notifyTaskAssigned(TASK_ID, undefined, OWNER_ID),
     ).rejects.toThrow("Task assignee is not a project member");
 
     expect(repository.createNotification).not.toHaveBeenCalled();
@@ -127,6 +128,7 @@ describe("Task-status notifications", () => {
         projectId: PROJECT_ID,
         assigneeId: USER_ID,
         status: "IN_PROGRESS",
+        project: { ownerId: OWNER_ID },
       }),
       findProjectMembership: jest.fn().mockResolvedValue({
         userId: USER_ID,
@@ -141,10 +143,7 @@ describe("Task-status notifications", () => {
   });
 
   test("notifies the assignee when the status changes", async () => {
-    const result = await service.notifyTaskStatusChanged(
-      TASK_ID,
-      "TODO",
-    );
+    const result = await service.notifyTaskStatusChanged(TASK_ID, "TODO", undefined, OWNER_ID);
 
     expect(repository.findNotificationTask).toHaveBeenCalledWith(
       TASK_ID,
@@ -175,7 +174,7 @@ describe("Task-status notifications", () => {
 
   test("does not notify when the status is unchanged", async () => {
     await expect(
-      service.notifyTaskStatusChanged(TASK_ID, "IN_PROGRESS"),
+      service.notifyTaskStatusChanged(TASK_ID, "IN_PROGRESS", undefined, OWNER_ID),
     ).resolves.toBeNull();
 
     expect(repository.findProjectMembership).not.toHaveBeenCalled();
@@ -188,10 +187,11 @@ describe("Task-status notifications", () => {
       projectId: PROJECT_ID,
       assigneeId: null,
       status: "IN_PROGRESS",
+        project: { ownerId: OWNER_ID },
     });
 
     await expect(
-      service.notifyTaskStatusChanged(TASK_ID, "TODO"),
+      service.notifyTaskStatusChanged(TASK_ID, "TODO", undefined, OWNER_ID),
     ).resolves.toBeNull();
 
     expect(repository.findProjectMembership).not.toHaveBeenCalled();
@@ -200,7 +200,7 @@ describe("Task-status notifications", () => {
 
   test("rejects an invalid task ID before querying", async () => {
     await expect(
-      service.notifyTaskStatusChanged("invalid-id", "TODO"),
+      service.notifyTaskStatusChanged("invalid-id", "TODO", undefined, OWNER_ID),
     ).rejects.toThrow("A valid task ID is required");
 
     expect(repository.findNotificationTask).not.toHaveBeenCalled();
@@ -209,7 +209,7 @@ describe("Task-status notifications", () => {
 
   test("rejects an invalid previous status before querying", async () => {
     await expect(
-      service.notifyTaskStatusChanged(TASK_ID, "INVALID"),
+      service.notifyTaskStatusChanged(TASK_ID, "INVALID", undefined, OWNER_ID),
     ).rejects.toThrow("A valid previous task status is required");
 
     expect(repository.findNotificationTask).not.toHaveBeenCalled();
@@ -220,7 +220,7 @@ describe("Task-status notifications", () => {
     repository.findNotificationTask.mockResolvedValue(null);
 
     await expect(
-      service.notifyTaskStatusChanged(TASK_ID, "TODO"),
+      service.notifyTaskStatusChanged(TASK_ID, "TODO", undefined, OWNER_ID),
     ).rejects.toThrow("Task not found");
 
     expect(repository.createNotification).not.toHaveBeenCalled();
@@ -235,18 +235,18 @@ describe("Task-status notifications", () => {
     });
 
     await expect(
-      service.notifyTaskStatusChanged(TASK_ID, "TODO"),
+      service.notifyTaskStatusChanged(TASK_ID, "TODO", undefined, OWNER_ID),
     ).rejects.toThrow("Task has an invalid status");
 
     expect(repository.createNotification).not.toHaveBeenCalled();
   });
 
-  test("rejects an assignee outside the project", async () => {
+  test("does not notify a removed assignee", async () => {
     repository.findProjectMembership.mockResolvedValue(null);
 
     await expect(
-      service.notifyTaskStatusChanged(TASK_ID, "TODO"),
-    ).rejects.toThrow("Task assignee is not a project member");
+      service.notifyTaskStatusChanged(TASK_ID, "TODO", undefined, OWNER_ID),
+    ).resolves.toBeNull();
 
     expect(repository.createNotification).not.toHaveBeenCalled();
   });
@@ -254,11 +254,7 @@ describe("Task-status notifications", () => {
   test("passes the transaction client to repository calls", async () => {
     const transaction = {};
 
-    await service.notifyTaskStatusChanged(
-      TASK_ID,
-      "TODO",
-      transaction,
-    );
+    await service.notifyTaskStatusChanged(TASK_ID, "TODO", transaction, OWNER_ID);
 
     expect(repository.findNotificationTask).toHaveBeenCalledWith(
       TASK_ID,
@@ -436,5 +432,42 @@ describe("Mention notifications", () => {
       }),
       transaction,
     );
+  });
+});
+describe("Actor-aware status recipients", () => {
+  let repository;
+  let service;
+  beforeEach(() => {
+    repository = {
+      findNotificationTask: jest.fn().mockResolvedValue({
+        id: TASK_ID, title: "Actor test task", projectId: PROJECT_ID,
+        assigneeId: USER_ID, status: "IN_PROGRESS", project: { ownerId: OWNER_ID },
+      }),
+      findProjectMembership: jest.fn().mockResolvedValue({ userId: USER_ID }),
+      createNotification: jest.fn().mockImplementation(async data => data),
+    };
+    service = createNotificationService(repository);
+  });
+  test("requires the assignment actor instead of guessing the recipient rule", async () => {
+    await expect(service.notifyTaskAssigned(TASK_ID)).rejects.toThrow("A valid actor ID is required");
+    expect(repository.createNotification).not.toHaveBeenCalled();
+  });
+  test("requires the status actor instead of silently notifying the assignee", async () => {
+    await expect(service.notifyTaskStatusChanged(TASK_ID, "TODO")).rejects.toThrow("A valid actor ID is required");
+    expect(repository.createNotification).not.toHaveBeenCalled();
+  });
+  test("an assignee status change notifies the canonical project Owner", async () => {
+    const result = await service.notifyTaskStatusChanged(TASK_ID, "TODO", undefined, USER_ID);
+    expect(result.userId).toBe(OWNER_ID);
+    expect(repository.findProjectMembership).not.toHaveBeenCalled();
+  });
+  test("a person who is both Owner and assignee receives no self-notification", async () => {
+    repository.findNotificationTask.mockResolvedValue({ id: TASK_ID, assigneeId: OWNER_ID, status: "IN_PROGRESS", project: { ownerId: OWNER_ID } });
+    await expect(service.notifyTaskStatusChanged(TASK_ID, "TODO", undefined, OWNER_ID)).resolves.toBeNull();
+    expect(repository.createNotification).not.toHaveBeenCalled();
+  });
+  test("an unrelated actor cannot generate a status notification", async () => {
+    await expect(service.notifyTaskStatusChanged(TASK_ID, "TODO", undefined, PROJECT_ID)).rejects.toThrow("Status actor must be the assignee or project Owner");
+    expect(repository.createNotification).not.toHaveBeenCalled();
   });
 });

@@ -221,8 +221,9 @@ async function findExistingIdempotentTask(userId, key, payloadHash) {
   return existing.task;
 }
 
-async function createTaskNormally(input) {
-  return prisma.task.create({
+async function createTaskNormally(input, userId) {
+  return prisma.$transaction(async (tx) => {
+  const task = await tx.task.create({
     data: {
       projectId: input.projectId,
       title: input.title,
@@ -234,6 +235,9 @@ async function createTaskNormally(input) {
       // Status intentionally omitted: Prisma applies the TODO default.
     },
     include: TASK_INCLUDE,
+  });
+  if (task.assigneeId) await notificationService.notifyTaskAssigned(task.id, tx, userId);
+  return task;
   });
 }
 
@@ -271,6 +275,8 @@ async function createTaskIdempotently({ input, userId, key }) {
         },
         include: TASK_INCLUDE,
       });
+
+      if (task.assigneeId) await notificationService.notifyTaskAssigned(task.id, tx, userId);
 
       await tx.taskCreationRequest.update({
         where: { id: request.id },
@@ -370,7 +376,7 @@ export async function createTask({
   }
 
   if (!key) {
-    return createTaskNormally(input);
+    return createTaskNormally(input, userId);
   }
 
   return createTaskIdempotently({ input, userId, key });
@@ -481,6 +487,11 @@ export async function changeTaskStatus({ taskId, status, userId }) {
       ],
     });
 
+    // The service routes the event to the other participant and suppresses
+    // self-notifications. Keep notification delivery in the same transaction.
+    await notificationService.notifyTaskStatusChanged(
+      taskId, task.status, tx, userId,
+    );
     return tx.task.findUnique({
       where: { id: taskId },
       include: TASK_INCLUDE,
@@ -720,7 +731,7 @@ export async function listProjectMembers(projectId) {
   });
 }
 
-export async function assignTask({ taskId, body }) {
+export async function assignTask({ taskId, body, userId }) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     invalid("Request body must be a JSON object");
   }
@@ -740,6 +751,7 @@ export async function assignTask({ taskId, body }) {
   }
 
   return prisma.$transaction(async (tx) => {
+    await lockTaskForUpdate(tx, taskId);
     const task = await tx.task.findUnique({
       where: { id: taskId },
       select: {
@@ -785,8 +797,8 @@ export async function assignTask({ taskId, body }) {
       include: { assignee: { select: { id: true, name: true, email: true } } },
     });
 
-    await notificationService.notifyTaskAssigned(taskId, tx);
+    await recordTaskActivity(tx, { taskId, actorId: userId, changes: [{ field: "assigneeId", oldValue: task.assigneeId, newValue: assigneeId }] });
+    await notificationService.notifyTaskAssigned(taskId, tx, userId);
     return updated;
   });
 }
-

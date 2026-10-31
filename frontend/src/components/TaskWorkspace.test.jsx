@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   cleanup,
+  act,
   fireEvent,
   render,
   screen,
@@ -17,6 +18,8 @@ vi.mock("../lib/api.js", () => ({
       projectTasks: vi.fn(),
       createTask: vi.fn(),
       changeTaskStatus: vi.fn(),
+      projectMembers: vi.fn(),
+      assignTask: vi.fn(),
   },
 }));
 
@@ -62,6 +65,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -286,4 +290,140 @@ it("expires the session when the status change returns 401", async () => {
   expect(statusSelect).toHaveValue("TODO");
 });
 
+});
+
+describe("TaskWorkspace background synchronization", () => {
+  const ownerId = "owner-1";
+  const member = { id: "member-1", name: "Member One", email: "member@example.test" };
+  let task;
+  let onSessionExpired;
+  function deferred() {
+    let resolve;
+    const promise = new Promise(done => { resolve = done; });
+    return { promise, resolve };
+  }
+  async function mount(props = {}) {
+    let view;
+    await act(async () => {
+      view = render(<TaskWorkspace token="sync-token" userId={ownerId} onSessionExpired={onSessionExpired} {...props} />);
+    });
+    return view;
+  }
+  async function poll() {
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+  }
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetAllMocks();
+    task = { ...createdTask("Shared task", "shared-1"), assigneeId: member.id, assignee: member };
+    onSessionExpired = vi.fn();
+    api.projects.mockResolvedValue({ projects: [{ ...project, ownerId }] });
+    api.projectTasks.mockResolvedValue({ tasks: [task] });
+    api.projectMembers.mockResolvedValue({ members: [{ user: member }] });
+  });
+  it("refreshes another user's status change without reload or losing form input", async () => {
+    await mount();
+    enterTitle("Unfinished draft");
+    fireEvent.change(screen.getByLabelText(/description/i), { target: { name: "description", value: "Keep my description" } });
+    api.projectTasks.mockResolvedValue({ tasks: [{ ...task, status: "IN_REVIEW" }] });
+    await poll();
+    expect(screen.getByRole("combobox", { name: "Status for Shared task" })).toHaveValue("IN_REVIEW");
+    expect(screen.getByLabelText(/title/i)).toHaveValue("Unfinished draft");
+    expect(screen.getByLabelText(/description/i)).toHaveValue("Keep my description");
+    expect(api.projectTasks).toHaveBeenCalledTimes(2);
+  });
+  it("ignores an old poll completing after a successful local status change", async () => {
+    await mount();
+    const stale = deferred();
+    api.projectTasks.mockReturnValueOnce(stale.promise);
+    await poll();
+    api.changeTaskStatus.mockResolvedValue({ task: { ...task, status: "IN_PROGRESS" } });
+    await act(async () => { fireEvent.change(screen.getByLabelText("Status for Shared task"), { target: { value: "IN_PROGRESS" } }); });
+    await act(async () => { stale.resolve({ tasks: [task] }); });
+    expect(screen.getByLabelText("Status for Shared task")).toHaveValue("IN_PROGRESS");
+  });
+  it("pauses refresh requests during a pending status write and resumes afterwards", async () => {
+    await mount();
+    const pending = deferred();
+    api.changeTaskStatus.mockReturnValueOnce(pending.promise);
+    fireEvent.change(screen.getByLabelText("Status for Shared task"), { target: { value: "IN_PROGRESS" } });
+    await poll();
+    expect(api.projectTasks).toHaveBeenCalledTimes(1);
+    await act(async () => { pending.resolve({ task: { ...task, status: "IN_PROGRESS" } }); });
+    api.projectTasks.mockResolvedValue({ tasks: [{ ...task, status: "IN_PROGRESS" }] });
+    await poll();
+    expect(api.projectTasks).toHaveBeenCalledTimes(2);
+    expect(screen.getByLabelText("Status for Shared task")).toHaveValue("IN_PROGRESS");
+  });
+  it("does not let a stale poll erase a newly created task", async () => {
+    await mount();
+    const stale = deferred();
+    api.projectTasks.mockReturnValueOnce(stale.promise);
+    await poll();
+    enterTitle("New task");
+    api.createTask.mockResolvedValue({ task: createdTask("New task", "new-1") });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Create task" })); });
+    await act(async () => { stale.resolve({ tasks: [task] }); });
+    expect(screen.getByText("New task")).toBeInTheDocument();
+  });
+  it("does not let a stale poll undo a successful assignment", async () => {
+    task = { ...task, assigneeId: null, assignee: null };
+    api.projectTasks.mockResolvedValue({ tasks: [task] });
+    await mount();
+    const stale = deferred();
+    api.projectTasks.mockReturnValueOnce(stale.promise);
+    await poll();
+    api.assignTask.mockResolvedValue({ task: { ...task, assigneeId: member.id, assignee: member } });
+    await act(async () => { fireEvent.change(screen.getByLabelText("Assignee for Shared task"), { target: { value: member.id } }); });
+    await act(async () => { stale.resolve({ tasks: [task] }); });
+    expect(screen.getByLabelText("Assignee for Shared task")).toHaveValue(member.id);
+  });
+  it("keeps the last good tasks and draft through a temporary refresh failure", async () => {
+    await mount();
+    enterTitle("Keep this draft");
+    api.projectTasks.mockRejectedValueOnce(new Error("Network unavailable"));
+    await poll();
+    expect(screen.getByText("Shared task")).toBeInTheDocument();
+    expect(screen.getByLabelText(/title/i)).toHaveValue("Keep this draft");
+    expect(screen.getByRole("alert")).toHaveTextContent("Could not refresh tasks");
+    api.projectTasks.mockResolvedValue({ tasks: [{ ...task, status: "IN_PROGRESS" }] });
+    await poll();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Status for Shared task")).toHaveValue("IN_PROGRESS");
+  });
+  it("stops polling and expires the session on 401", async () => {
+    await mount();
+    api.projectTasks.mockRejectedValueOnce(Object.assign(new Error("Expired"), { status: 401 }));
+    await poll();
+    expect(onSessionExpired).toHaveBeenCalledOnce();
+    await poll();
+    expect(api.projectTasks).toHaveBeenCalledTimes(2);
+  });
+  it("clears inaccessible task data and stops polling on revoked access", async () => {
+    await mount();
+    api.projectTasks.mockRejectedValueOnce(Object.assign(new Error("Access revoked"), { status: 403 }));
+    await poll();
+    expect(screen.queryByText("Shared task")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Access revoked");
+    await poll();
+    expect(api.projectTasks).toHaveBeenCalledTimes(2);
+  });
+  it("ignores late responses from a previously selected project", async () => {
+    api.projects.mockResolvedValue({ projects: [{ ...project, ownerId }, { ...project, id: "project-2", name: "Project Two", ownerId }] });
+    await mount();
+    const stale = deferred();
+    api.projectTasks.mockReturnValueOnce(stale.promise);
+    await poll();
+    api.projectTasks.mockResolvedValue({ tasks: [createdTask("Second project task", "second-1")] });
+    await act(async () => { fireEvent.change(screen.getByLabelText("Project"), { target: { value: "project-2" } }); });
+    await act(async () => { stale.resolve({ tasks: [task] }); });
+    expect(screen.getByText("Second project task")).toBeInTheDocument();
+    expect(screen.queryByText("Shared task")).not.toBeInTheDocument();
+  });
+  it("cleans up its timer on unmount", async () => {
+    const view = await mount();
+    view.unmount();
+    await poll();
+    expect(api.projectTasks).toHaveBeenCalledTimes(1);
+  });
 });

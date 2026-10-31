@@ -102,6 +102,23 @@ export const api = {
       method: "POST",
       token,
     }),
+    listNotifications: (token) =>
+    request("/notifications", { token }),
+
+  getUnreadNotificationCount: (token) =>
+    request("/notifications/unread-count", { token }),
+
+  markNotificationRead: (token, notificationId) =>
+    request(
+      `/notifications/${encodeURIComponent(notificationId)}/read`,
+      { method: "PATCH", token },
+    ),
+
+  markAllNotificationsRead: (token) =>
+    request("/notifications/read-all", {
+      method: "PATCH",
+      token,
+    }),
 };
 
 export { ApiError };

@@ -128,6 +128,7 @@ before(async () => {
 
 after(async () => {
   if (project) {
+    await prisma.notification.deleteMany({ where: { userId: { in: Object.values(users).map(user => user.id) } } });
     const projectTasks = await prisma.task.findMany({
       where: { projectId: project.id },
       select: { id: true },

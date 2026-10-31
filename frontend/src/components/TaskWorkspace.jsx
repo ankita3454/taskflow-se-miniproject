@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api.js";
 
@@ -21,6 +20,7 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState("");
   const [tasks, setTasks] = useState([]);
+  const [taskRefreshError, setTaskRefreshError] = useState("");
   const [members, setMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [assigningTaskId, setAssigningTaskId] = useState(null);
@@ -35,6 +35,23 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
 
   // Retains the idempotency key for a submission that may need retrying.
   const pendingSubmission = useRef(null);
+  // Refreshes must not overwrite the result of an intervening local write.
+  const taskSync = useRef({ version: 0, pending: 0, scope: 0 });
+
+  function beginTaskMutation() {
+    taskSync.current.version += 1;
+    taskSync.current.pending += 1;
+    return taskSync.current.scope;
+  }
+
+  function endTaskMutation() {
+    taskSync.current.version += 1;
+    taskSync.current.pending -= 1;
+  }
+
+  function isCurrentScope(scope) {
+    return taskSync.current.scope === scope;
+  }
 
   const selectedProject = projects.find(
     (project) => project.id === projectId,
@@ -89,43 +106,55 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
 
   useEffect(() => {
     let cancelled = false;
+    let stopped = false;
+    let timeoutId;
+    const sync = taskSync.current;
+    const scope = ++sync.scope;
 
-    async function loadTasks() {
-      if (!projectId) {
-        setTasks([]);
-        setLoadingTasks(false);
-        return;
-      }
-
-      setLoadingTasks(true);
-      setError("");
-
+    async function refreshTasks() {
       try {
+        if (taskSync.current.pending > 0) return;
+        const version = taskSync.current.version;
         const result = await api.projectTasks(projectId, token);
-
-        if (!cancelled) {
-          setTasks(result.tasks);
-        }
+        if (cancelled || !isCurrentScope(scope) ||
+            taskSync.current.pending > 0 || version !== taskSync.current.version) return;
+        setTasks(result.tasks);
+        setTaskRefreshError("");
       } catch (err) {
-        if (cancelled) return;
-
+        if (cancelled || !isCurrentScope(scope)) return;
         if (err.status === 401) {
+          stopped = true;
           onSessionExpired();
-        } else {
-          setError(err.message);
+        } else if (err.status === 403 || err.status === 404) {
+          // Do not leave project data visible after access is revoked.
+          stopped = true;
           setTasks([]);
+          setTaskRefreshError(err.message || "This project is no longer accessible.");
+        } else {
+          // Retain the last good list and all form fields; retry the next poll.
+          setTaskRefreshError("Could not refresh tasks. Retrying shortly.");
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && isCurrentScope(scope)) {
           setLoadingTasks(false);
+          if (!stopped) timeoutId = window.setTimeout(refreshTasks, 5000);
         }
       }
     }
 
-    loadTasks();
-
+    // Defer initial state synchronization; StrictMode cleanup can cancel it.
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      setTasks([]);
+      setTaskRefreshError("");
+      setLoadingTasks(Boolean(projectId));
+      if (projectId) void refreshTasks();
+    });
     return () => {
       cancelled = true;
+      window.clearTimeout(timeoutId);
+      // Also invalidate any pending mutation response after unmount/scope change.
+      if (sync.scope === scope) sync.scope += 1;
     };
   }, [projectId, token, onSessionExpired]);
 
@@ -188,21 +217,25 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
     setError("");
     setNotice("");
     setAssigningTaskId(task.id);
+    const scope = beginTaskMutation();
 
     try {
       const result = await api.assignTask(task.id, assigneeId, token);
+      if (!isCurrentScope(scope)) return;
       setTasks((current) =>
         current.map((item) => item.id === task.id ? result.task : item),
       );
       setNotice(`Assigned "${task.title}" to ${result.task.assignee.name}.`);
     } catch (err) {
+      if (!isCurrentScope(scope)) return;
       if (err.status === 401) {
         onSessionExpired();
       } else {
         setError(err.message);
       }
     } finally {
-      setAssigningTaskId(null);
+      endTaskMutation();
+      if (isCurrentScope(scope)) setAssigningTaskId(null);
     }
   }
 
@@ -246,12 +279,14 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
     const idempotencyKey = pendingSubmission.current.key;
 
     setSaving(true);
+    const scope = beginTaskMutation();
     try {
       const result = await api.createTask(
         payload,
         token,
         idempotencyKey,
       );
+      if (!isCurrentScope(scope)) return;
       // Clear the key only after successful creation.
       pendingSubmission.current = null;
 
@@ -259,6 +294,7 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
       setFields(emptyFields);
       setNotice("Task created successfully.");
     } catch (err) {
+      if (!isCurrentScope(scope)) return;
       if (err.status === 401) {
         onSessionExpired();
       } else {
@@ -267,7 +303,8 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
       }
       // Keep the pending key so an unchanged submission can be retried.
     } finally {
-      setSaving(false);
+      endTaskMutation();
+      if (isCurrentScope(scope)) setSaving(false);
     }
   }
 
@@ -279,12 +316,14 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
       current.includes(task.id) ? current : [...current, task.id],
     );
 
+    const scope = beginTaskMutation();
     try {
       const result = await api.changeTaskStatus(
         task.id,
         nextStatus,
         token,
       );
+      if (!isCurrentScope(scope)) return;
 
       setTasks((current) =>
         current.map((item) =>
@@ -296,15 +335,19 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
         `Task status updated to ${nextStatus.replaceAll("_", " ")}.`,
       );
     } catch (err) {
+      if (!isCurrentScope(scope)) return;
       if (err.status === 401) {
         onSessionExpired();
       } else {
         setError(err.message);
       }
     } finally {
-      setUpdatingTaskIds((current) =>
-        current.filter((id) => id !== task.id),
-      );
+      endTaskMutation();
+      if (isCurrentScope(scope)) {
+        setUpdatingTaskIds((current) =>
+          current.filter((id) => id !== task.id),
+        );
+      }
     }
   }
 
@@ -336,6 +379,7 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
       ) : (
         <select
           id="task-project"
+          disabled={saving || assigningTaskId !== null || updatingTaskIds.length > 0}
           value={projectId}
           onChange={(event) => {
             pendingSubmission.current = null;
@@ -469,6 +513,7 @@ export default function TaskWorkspace({ token, userId, onSessionExpired }) {
       </form>
 
       <h3>Task list</h3>
+      {taskRefreshError && <p role="alert">{taskRefreshError}</p>}
 
       {loadingTasks ? (
         <p role="status">Loading tasks...</p>

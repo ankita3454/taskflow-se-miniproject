@@ -95,6 +95,7 @@ before(async () => {
 
 after(async () => {
   if (task) {
+    await prisma.activityLog.deleteMany({ where: { taskId: task.id } });
     await prisma.notification.deleteMany({ where: { taskId: task.id } });
     await prisma.task.delete({ where: { id: task.id } });
   }

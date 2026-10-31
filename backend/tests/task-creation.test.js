@@ -111,6 +111,7 @@ after(async () => {
   const projectIds = [project?.id, archivedProject?.id].filter(Boolean);
 
   if (projectIds.length) {
+    await prisma.notification.deleteMany({ where: { userId: { in: Object.values(users).map(user => user.id) } } });
     await prisma.taskCreationRequest.deleteMany({
   where: {
     userId: { in: Object.values(users).map((user) => user.id) },

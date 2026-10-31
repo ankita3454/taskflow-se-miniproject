@@ -4,6 +4,7 @@ import { api } from "./lib/api.js";
 import LoginForm from "./components/LoginForm.jsx";
 import RegisterForm from "./components/RegisterForm.jsx";
 import ProfileView from "./components/ProfileView.jsx";
+import NotificationBell from "./components/NotificationBell.jsx";
 import TaskWorkspace from "./components/TaskWorkspace.jsx";
 
 const TOKEN_STORAGE_KEY = "taskflow.token";
@@ -85,6 +86,7 @@ export default function App() {
 
  {token && user ? (
   <>
+    <NotificationBell key={user.id} token={token} onSessionExpired={handleSessionExpired} />
     <ProfileView
       token={token}
       user={user}

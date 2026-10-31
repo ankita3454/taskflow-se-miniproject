@@ -4,10 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test \"tests/**/*.test.js\"",
+    "test": "npm run test:core && npm run test:notifications",
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "db:check": "node scripts/check-db.js"
+    "db:check": "node scripts/check-db.js",
+    "test:core": "node scripts/run-node-tests.js",
+    "test:notifications": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --testMatch \"**/notification*.test.js\""
   },
   "keywords": [],
   "author": "",
@@ -22,6 +24,7 @@
     "jsonwebtoken": "^9.0.3"
   },
   "devDependencies": {
-    "prisma": "^6.19.3"
+    "prisma": "^6.19.3",
+    "jest": "^30.5.2"
   }
 }

@@ -126,7 +126,7 @@ router.patch(
   requireAuth,
   requireTaskProjectOwner(),
   handle(async (req, res) => {
-    const task = await assignTask({ taskId: req.task.id, body: req.body });
+    const task = await assignTask({ taskId: req.task.id, body: req.body, userId: req.user.id });
     res.status(200).json({ task });
   }),
 );

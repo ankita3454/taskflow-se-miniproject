@@ -423,6 +423,7 @@ export async function changeTaskStatus({ taskId, status, userId }) {
   }
 
   return prisma.$transaction(async (tx) => {
+    await lockTaskForUpdate(tx, taskId);
     const task = await tx.task.findUnique({
       where: { id: taskId },
     });
@@ -600,6 +601,7 @@ export async function updateTask({ taskId, body, userId }) {
   }
 
   return prisma.$transaction(async (tx) => {
+    await lockTaskForUpdate(tx, taskId);
     const existing = await tx.task.findUnique({
       where: { id: taskId },
     });
@@ -673,7 +675,7 @@ export async function updateTask({ taskId, body, userId }) {
       where: { id: taskId },
       include: TASK_INCLUDE,
     });
-  });
+  }, { maxWait: 15000, timeout: 15000 });
 }
 async function recordTaskActivity(tx, { taskId, actorId, changes }) {
   if (changes.length === 0) return;
@@ -691,4 +693,16 @@ async function recordTaskActivity(tx, { taskId, actorId, changes }) {
 
 function dateValue(value) {
   return value === null ? null : value.toISOString().slice(0, 10);
+}
+
+// Acquire the row lock before reading values used for validation and activity
+// logging. PostgreSQL keeps the lock until this transaction commits/rolls back.
+// Concurrent edits therefore read the latest committed values after waiting.
+async function lockTaskForUpdate(tx, taskId) {
+  await tx.$queryRaw`
+    SELECT task_id
+    FROM tasks
+    WHERE task_id = ${taskId}::uuid
+    FOR UPDATE
+  `;
 }

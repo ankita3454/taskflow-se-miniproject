@@ -20,6 +20,7 @@ model User {
   passwordHash String   @map("password_hash") @db.VarChar(60)
   role         UserRole @default(MEMBER)
   active       Boolean  @default(true)
+  sessionVersion Int @default(0) @map("session_version")
 
   ownedProjects   Project[]           @relation("ProjectOwner")
   memberships     ProjectMember[]
@@ -38,6 +39,9 @@ model Project {
   name     String  @db.VarChar(150)
   ownerId  String  @map("owner_id") @db.Uuid
   archived Boolean @default(false)
+  sprintStart DateTime? @map("sprint_start") @db.Date
+  sprintEnd DateTime? @map("sprint_end") @db.Date
+  tags Tag[]
 
   owner       User                @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
   members     ProjectMember[]
@@ -115,6 +119,11 @@ model Task {
   notifications Notification[]
   creationRequest TaskCreationRequest?
   activityLogs    ActivityLog[]
+  comments Comment[]
+  taskTags TaskTag[]
+  blockers TaskDependency[] @relation("BlockedTask")
+  blocking TaskDependency[] @relation("BlockingTask")
+  reminders Reminder[]
 
   @@index([projectId, status])
   @@index([assigneeId])
@@ -145,7 +154,7 @@ model ActivityLog {
   newValue  Json?    @map("new_value")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  task  Task @relation(fields: [taskId], references: [id], onDelete: Restrict)
+  task  Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
   actor User @relation(fields: [actorId], references: [id], onDelete: Restrict)
 
   @@index([taskId, createdAt])
@@ -168,4 +177,71 @@ model Notification {
   @@index([userId, isRead])
   @@index([userId, createdAt])
   @@map("notifications")
+}
+
+
+model TaskDependency {
+  taskId String @map("task_id") @db.Uuid
+  blockerId String @map("blocker_id") @db.Uuid
+  task Task @relation("BlockedTask", fields: [taskId], references: [id], onDelete: Cascade)
+  blocker Task @relation("BlockingTask", fields: [blockerId], references: [id], onDelete: Cascade)
+  @@id([taskId, blockerId])
+  @@index([blockerId])
+  @@map("task_dependencies")
+}
+
+model Tag {
+  id String @id @default(uuid()) @db.Uuid
+  projectId String @map("project_id") @db.Uuid
+  name String @db.VarChar(80)
+  normalizedName String @map("normalized_name") @db.VarChar(80)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  tasks TaskTag[]
+  @@unique([projectId, normalizedName])
+  @@map("tags")
+}
+
+model TaskTag {
+  taskId String @map("task_id") @db.Uuid
+  tagId String @map("tag_id") @db.Uuid
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  @@id([taskId, tagId])
+  @@index([tagId])
+  @@map("task_tags")
+}
+
+model Comment {
+  id String @id @default(uuid()) @db.Uuid
+  taskId String @map("task_id") @db.Uuid
+  authorId String @map("author_id") @db.Uuid
+  body String @db.VarChar(2000)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  @@index([taskId, createdAt, id])
+  @@map("comments")
+}
+
+model AuditLog {
+  id String @id @default(uuid()) @db.Uuid
+  actorId String? @map("actor_id") @db.Uuid
+  targetId String? @map("target_id") @db.Uuid
+  event String @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@index([event, createdAt])
+  @@index([createdAt, id])
+  @@map("audit_logs")
+}
+
+model Reminder {
+  id String @id @default(uuid()) @db.Uuid
+  taskId String @map("task_id") @db.Uuid
+  interval Int
+  state String @default("CLAIMED") @db.VarChar(20)
+  recipientId String @map("recipient_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  sentAt DateTime? @map("sent_at") @db.Timestamptz(3)
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  @@unique([taskId, interval])
+  @@map("reminders")
 }

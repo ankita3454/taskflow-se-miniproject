@@ -14,9 +14,13 @@ if (!SECRET) {
  * password hash or any other sensitive field (SEC-05).
  */
 export function signToken(user) {
-  return jwt.sign({ sub: user.id, role: user.role }, SECRET, {
-    expiresIn: EXPIRES_IN,
-  });
+  return jwt.sign(
+    { sub: user.id, role: user.role, version: user.sessionVersion ?? 0 },
+    SECRET,
+    {
+      expiresIn: EXPIRES_IN,
+    },
+  );
 }
 
 /**

@@ -32,13 +32,13 @@ export async function requireAuth(req, res, next) {
   try {
     user = await prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, role: true, active: true },
+      select: { id: true, role: true, active: true, sessionVersion: true },
     });
   } catch (error) {
     return next(error);
   }
 
-  if (!user || !user.active) {
+  if (!user || !user.active || (payload.version ?? 0) !== user.sessionVersion) {
     return unauthenticated(res, "Session is no longer valid");
   }
 
@@ -62,7 +62,10 @@ export function requireRole(...roles) {
     }
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
-        error: { code: "FORBIDDEN", message: "Your role does not permit this action" },
+        error: {
+          code: "FORBIDDEN",
+          message: "Your role does not permit this action",
+        },
       });
     }
     return next();

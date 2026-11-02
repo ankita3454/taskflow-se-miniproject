@@ -7,6 +7,9 @@ import invitationRoutes from "./routes/invitations.routes.js";
 
 import notificationRoutes from "./routes/notification.routes.js";
 
+import securityRoutes from "./sprint2/security.routes.js";
+import { createLoginLimiter, recordAudit } from "./sprint2/security.js";
+
 const app = express();
 
 app.use(
@@ -15,6 +18,8 @@ app.use(
   }),
 );
 
+// Count malformed JSON attempts too: throttle before the body parser.
+app.post("/api/v1/auth/login", createLoginLimiter());
 app.use(express.json());
 
 app.get("/api/v1/health", (_req, res) => {
@@ -24,6 +29,7 @@ app.get("/api/v1/health", (_req, res) => {
   });
 });
 
+app.use("/api/v1/admin", securityRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1", taskRoutes);
 app.use("/api/v1/projects", projectRoutes);
@@ -40,8 +46,15 @@ app.use((_req, res) => {
   });
 });
 
-app.use((error, _req, res, _next) => {
+app.use(async (error, _req, res, _next) => {
   const invalidJson = error.type === "entity.parse.failed";
+  if (invalidJson && _req.path === "/api/v1/auth/login") {
+    try {
+      await recordAudit("LOGIN_FAILED");
+    } catch {
+      /* Respond without exposing storage errors. */
+    }
+  }
 
   res.status(invalidJson ? 400 : 500).json({
     error: {

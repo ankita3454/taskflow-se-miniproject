@@ -10,6 +10,6 @@ function collect(directory) {
 const files = collect('tests').filter(path => path.endsWith('.test.js') &&
   !/^notification.*\.test\.js$/.test(basename(path))).sort();
 if (files.length === 0) throw new Error('No core backend tests found');
-const result = spawnSync(process.execPath, ['--test', ...files], { stdio: 'inherit' });
+const result = spawnSync(process.execPath, ['--test', ...files], { stdio: 'inherit', env: { ...process.env, LOGIN_RATE_LIMIT: process.env.LOGIN_RATE_LIMIT || '10000' } });
 if (result.error) throw result.error;
 process.exit(result.status ?? 1);

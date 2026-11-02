@@ -1,4 +1,5 @@
 import prisma from "../repositories/prisma.js";
+import { lockProject } from "../sprint2/common.js";
 import { isUuid } from "./permissionService.js";
 import notificationService from "./notification.service.js";
 import { Prisma } from "@prisma/client";
@@ -29,9 +30,7 @@ function isValidUUID(value) {
 }
 
 function hashTaskInput(input) {
-  return createHash("sha256")
-    .update(JSON.stringify(input))
-    .digest("hex");
+  return createHash("sha256").update(JSON.stringify(input)).digest("hex");
 }
 
 export class TaskError extends Error {
@@ -53,8 +52,9 @@ function isValidDateOnly(value) {
   }
 
   const date = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(date.getTime()) &&
-    date.toISOString().slice(0, 10) === value;
+  return (
+    !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+  );
 }
 
 function validateCreateInput(body) {
@@ -104,9 +104,12 @@ function validateCreateInput(body) {
 
     description = body.description.trim();
     if (description.length > MAX_DESCRIPTION_LENGTH) {
-      invalid(`Description must be at most ${MAX_DESCRIPTION_LENGTH} characters`, {
-        description: `Description must be at most ${MAX_DESCRIPTION_LENGTH} characters`,
-      });
+      invalid(
+        `Description must be at most ${MAX_DESCRIPTION_LENGTH} characters`,
+        {
+          description: `Description must be at most ${MAX_DESCRIPTION_LENGTH} characters`,
+        },
+      );
     }
   }
 
@@ -117,7 +120,11 @@ function validateCreateInput(body) {
   }
 
   let dueDate;
-  if (body.dueDate !== undefined && body.dueDate !== null && body.dueDate !== "") {
+  if (
+    body.dueDate !== undefined &&
+    body.dueDate !== null &&
+    body.dueDate !== ""
+  ) {
     if (!isValidDateOnly(body.dueDate)) {
       invalid("Due date must be a valid date in YYYY-MM-DD format", {
         dueDate: "Use a valid date in YYYY-MM-DD format",
@@ -128,7 +135,11 @@ function validateCreateInput(body) {
   }
 
   let timeEstimate;
-  if (body.timeEstimate !== undefined && body.timeEstimate !== null && body.timeEstimate !== "") {
+  if (
+    body.timeEstimate !== undefined &&
+    body.timeEstimate !== null &&
+    body.timeEstimate !== ""
+  ) {
     if (
       typeof body.timeEstimate !== "number" ||
       !Number.isFinite(body.timeEstimate) ||
@@ -143,7 +154,11 @@ function validateCreateInput(body) {
   }
 
   let assigneeId;
-  if (body.assigneeId !== undefined && body.assigneeId !== null && body.assigneeId !== "") {
+  if (
+    body.assigneeId !== undefined &&
+    body.assigneeId !== null &&
+    body.assigneeId !== ""
+  ) {
     if (!isValidUUID(body.assigneeId)) {
       invalid("Assignee ID is invalid", {
         assigneeId: "Assignee ID must be a valid UUID",
@@ -172,9 +187,12 @@ function validateIdempotencyKey(key) {
     key.trim().length === 0 ||
     key.length > MAX_IDEMPOTENCY_KEY_LENGTH
   ) {
-    invalid(`Idempotency-Key must contain 1-${MAX_IDEMPOTENCY_KEY_LENGTH} characters`, {
-      idempotencyKey: `Provide a non-empty key of at most ${MAX_IDEMPOTENCY_KEY_LENGTH} characters`,
-    });
+    invalid(
+      `Idempotency-Key must contain 1-${MAX_IDEMPOTENCY_KEY_LENGTH} characters`,
+      {
+        idempotencyKey: `Provide a non-empty key of at most ${MAX_IDEMPOTENCY_KEY_LENGTH} characters`,
+      },
+    );
   }
 
   return key;
@@ -223,21 +241,23 @@ async function findExistingIdempotentTask(userId, key, payloadHash) {
 
 async function createTaskNormally(input, userId) {
   return prisma.$transaction(async (tx) => {
-  const task = await tx.task.create({
-    data: {
-      projectId: input.projectId,
-      title: input.title,
-      description: input.description,
-      priority: input.priority,
-      dueDate: input.dueDate,
-      timeEstimate: input.timeEstimate,
-      assigneeId: input.assigneeId,
-      // Status intentionally omitted: Prisma applies the TODO default.
-    },
-    include: TASK_INCLUDE,
-  });
-  if (task.assigneeId) await notificationService.notifyTaskAssigned(task.id, tx, userId);
-  return task;
+    await validateCreationAccess(tx, input, userId);
+    const task = await tx.task.create({
+      data: {
+        projectId: input.projectId,
+        title: input.title,
+        description: input.description,
+        priority: input.priority,
+        dueDate: input.dueDate,
+        timeEstimate: input.timeEstimate,
+        assigneeId: input.assigneeId,
+        // Status intentionally omitted: Prisma applies the TODO default.
+      },
+      include: TASK_INCLUDE,
+    });
+    if (task.assigneeId)
+      await notificationService.notifyTaskAssigned(task.id, tx, userId);
+    return task;
   });
 }
 
@@ -254,6 +274,7 @@ async function createTaskIdempotently({ input, userId, key }) {
 
   try {
     return await prisma.$transaction(async (tx) => {
+      await validateCreationAccess(tx, input, userId);
       // The unique (userId, key) constraint arbitrates concurrent retries.
       const request = await tx.taskCreationRequest.create({
         data: {
@@ -276,7 +297,8 @@ async function createTaskIdempotently({ input, userId, key }) {
         include: TASK_INCLUDE,
       });
 
-      if (task.assigneeId) await notificationService.notifyTaskAssigned(task.id, tx, userId);
+      if (task.assigneeId)
+        await notificationService.notifyTaskAssigned(task.id, tx, userId);
 
       await tx.taskCreationRequest.update({
         where: { id: request.id },
@@ -291,11 +313,7 @@ async function createTaskIdempotently({ input, userId, key }) {
     // Another request may have won the race. Its transaction must commit
     // before its task becomes visible, so retry the lookup briefly.
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const task = await findExistingIdempotentTask(
-        userId,
-        key,
-        payloadHash,
-      );
+      const task = await findExistingIdempotentTask(userId, key, payloadHash);
 
       if (task) return task;
 
@@ -393,10 +411,7 @@ export async function listProjectTasks(projectId) {
 export async function listAccessibleProjects(userId) {
   return prisma.project.findMany({
     where: {
-      OR: [
-        { ownerId: userId },
-        { members: { some: { userId } } },
-      ],
+      OR: [{ ownerId: userId }, { members: { some: { userId } } }],
     },
     select: {
       id: true,
@@ -408,18 +423,10 @@ export async function listAccessibleProjects(userId) {
   });
 }
 
-const VALID_TASK_STATUSES = [
-  "TODO",
-  "IN_PROGRESS",
-  "IN_REVIEW",
-  "DONE",
-];
+const VALID_TASK_STATUSES = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
 
 export async function changeTaskStatus({ taskId, status, userId }) {
-  if (
-    typeof status !== "string" ||
-    !VALID_TASK_STATUSES.includes(status)
-  ) {
+  if (typeof status !== "string" || !VALID_TASK_STATUSES.includes(status)) {
     throw new TaskError(
       400,
       "VALIDATION_ERROR",
@@ -431,6 +438,9 @@ export async function changeTaskStatus({ taskId, status, userId }) {
   }
 
   return prisma.$transaction(async (tx) => {
+    const initial = await tx.task.findUnique({ where: { id: taskId } });
+    if (!initial) throw new TaskError(404, "NOT_FOUND", "Task not found");
+    await lockProject(tx, initial.projectId);
     await lockTaskForUpdate(tx, taskId);
     const task = await tx.task.findUnique({
       where: { id: taskId },
@@ -440,6 +450,26 @@ export async function changeTaskStatus({ taskId, status, userId }) {
       throw new TaskError(404, "NOT_FOUND", "Task not found");
     }
 
+    // Recheck permissions inside the lock; membership can change after middleware.
+    const project = await tx.project.findUnique({
+      where: { id: task.projectId },
+    });
+    const member = await tx.projectMember.findUnique({
+      where: { projectId_userId: { projectId: task.projectId, userId } },
+    });
+    if (project.ownerId !== userId && (!member || task.assigneeId !== userId))
+      throw new TaskError(403, "FORBIDDEN", "Task status access denied");
+    if (status === "DONE") {
+      const count = await tx.taskDependency.count({
+        where: { taskId, blocker: { status: { not: "DONE" } } },
+      });
+      if (count)
+        throw new TaskError(
+          409,
+          "TASK_BLOCKED",
+          "Complete all blocking tasks before marking this task Done",
+        );
+    }
     const allowed = ALLOWED_STATUS_TRANSITIONS[task.status] ?? [];
 
     const isUnassignedReturn =
@@ -490,7 +520,10 @@ export async function changeTaskStatus({ taskId, status, userId }) {
     // The service routes the event to the other participant and suppresses
     // self-notifications. Keep notification delivery in the same transaction.
     await notificationService.notifyTaskStatusChanged(
-      taskId, task.status, tx, userId,
+      taskId,
+      task.status,
+      tx,
+      userId,
     );
     return tx.task.findUnique({
       where: { id: taskId },
@@ -599,11 +632,7 @@ export async function updateTask({ taskId, body, userId }) {
     if (value === null || value === "") {
       data.timeEstimate = null;
     } else {
-      if (
-        typeof value !== "number" ||
-        !Number.isFinite(value) ||
-        value < 0
-      ) {
+      if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
         invalid("Time estimate must be a non-negative number", {
           timeEstimate: "Enter a non-negative number, or null to clear it",
         });
@@ -613,82 +642,90 @@ export async function updateTask({ taskId, body, userId }) {
     }
   }
 
-  return prisma.$transaction(async (tx) => {
-    await lockTaskForUpdate(tx, taskId);
-    const existing = await tx.task.findUnique({
-      where: { id: taskId },
-    });
-
-    if (!existing) {
-      throw new TaskError(404, "NOT_FOUND", "Task not found");
-    }
-
-    if (existing.status === "DONE") {
-      throw new TaskError(
-        409,
-        "TASK_COMPLETED",
-        "Completed tasks cannot be edited",
-      );
-    }
-
-    const changes = [];
-
-    for (const field of Object.keys(data)) {
-      const oldValue =
-        field === "dueDate"
-          ? dateValue(existing.dueDate)
-          : existing[field];
-
-      const newValue =
-        field === "dueDate"
-          ? dateValue(data.dueDate)
-          : data[field];
-
-      if (oldValue !== newValue) {
-        changes.push({
-          field,
-          oldValue,
-          newValue,
-        });
-      }
-    }
-
-    const result = await tx.task.updateMany({
-      where: {
-        id: taskId,
-        status: { not: "DONE" },
-      },
-      data,
-    });
-
-    if (result.count === 0) {
-      const current = await tx.task.findUnique({
+  return prisma.$transaction(
+    async (tx) => {
+      await lockTaskForUpdate(tx, taskId);
+      const existing = await tx.task.findUnique({
         where: { id: taskId },
-        select: { id: true, status: true },
       });
 
-      if (!current) {
+      if (!existing) {
         throw new TaskError(404, "NOT_FOUND", "Task not found");
       }
 
-      throw new TaskError(
-        409,
-        "TASK_COMPLETED",
-        "Completed tasks cannot be edited",
-      );
-    }
+      const owningProject = await tx.project.findUnique({
+        where: { id: existing.projectId },
+      });
+      if (owningProject.ownerId !== userId)
+        throw new TaskError(
+          403,
+          "FORBIDDEN",
+          "Only the current Project Owner can edit",
+        );
+      if (existing.status === "DONE") {
+        throw new TaskError(
+          409,
+          "TASK_COMPLETED",
+          "Completed tasks cannot be edited",
+        );
+      }
 
-    await recordTaskActivity(tx, {
-      taskId,
-      actorId: userId,
-      changes,
-    });
+      const changes = [];
 
-    return tx.task.findUnique({
-      where: { id: taskId },
-      include: TASK_INCLUDE,
-    });
-  }, { maxWait: 15000, timeout: 15000 });
+      for (const field of Object.keys(data)) {
+        const oldValue =
+          field === "dueDate" ? dateValue(existing.dueDate) : existing[field];
+
+        const newValue =
+          field === "dueDate" ? dateValue(data.dueDate) : data[field];
+
+        if (oldValue !== newValue) {
+          changes.push({
+            field,
+            oldValue,
+            newValue,
+          });
+        }
+      }
+
+      const result = await tx.task.updateMany({
+        where: {
+          id: taskId,
+          status: { not: "DONE" },
+        },
+        data,
+      });
+
+      if (result.count === 0) {
+        const current = await tx.task.findUnique({
+          where: { id: taskId },
+          select: { id: true, status: true },
+        });
+
+        if (!current) {
+          throw new TaskError(404, "NOT_FOUND", "Task not found");
+        }
+
+        throw new TaskError(
+          409,
+          "TASK_COMPLETED",
+          "Completed tasks cannot be edited",
+        );
+      }
+
+      await recordTaskActivity(tx, {
+        taskId,
+        actorId: userId,
+        changes,
+      });
+
+      return tx.task.findUnique({
+        where: { id: taskId },
+        include: TASK_INCLUDE,
+      });
+    },
+    { maxWait: 15000, timeout: 15000 },
+  );
 }
 async function recordTaskActivity(tx, { taskId, actorId, changes }) {
   if (changes.length === 0) return;
@@ -711,7 +748,43 @@ function dateValue(value) {
 // Acquire the row lock before reading values used for validation and activity
 // logging. PostgreSQL keeps the lock until this transaction commits/rolls back.
 // Concurrent edits therefore read the latest committed values after waiting.
+async function validateCreationAccess(tx, input, userId) {
+  await lockProject(tx, input.projectId);
+  const project = await tx.project.findUnique({
+    where: { id: input.projectId },
+  });
+  const membership = await tx.projectMember.findUnique({
+    where: { projectId_userId: { projectId: input.projectId, userId } },
+  });
+  if (!project || !membership)
+    throw new TaskError(403, "FORBIDDEN", "Project access denied");
+  if (project.archived)
+    throw new TaskError(
+      409,
+      "PROJECT_ARCHIVED",
+      "Cannot create tasks in an archived project",
+    );
+  if (input.assigneeId) {
+    const member = await tx.projectMember.findUnique({
+      where: {
+        projectId_userId: {
+          projectId: input.projectId,
+          userId: input.assigneeId,
+        },
+      },
+      include: { user: true },
+    });
+    if (project.ownerId !== userId || !member?.user.active)
+      throw new TaskError(
+        403,
+        "FORBIDDEN",
+        "Only the current Owner may assign an active member",
+      );
+  }
+}
 async function lockTaskForUpdate(tx, taskId) {
+  const initial = await tx.task.findUnique({ where: { id: taskId } });
+  if (initial) await lockProject(tx, initial.projectId);
   await tx.$queryRaw`
     SELECT task_id
     FROM tasks
@@ -764,6 +837,15 @@ export async function assignTask({ taskId, body, userId }) {
       throw new TaskError(404, "NOT_FOUND", "Task not found");
     }
 
+    const project = await tx.project.findUnique({
+      where: { id: task.projectId },
+    });
+    if (project.ownerId !== userId)
+      throw new TaskError(
+        403,
+        "FORBIDDEN",
+        "Only the current Project Owner can assign",
+      );
     const assignee = await tx.user.findUnique({
       where: { id: assigneeId },
       select: { id: true, active: true },
@@ -787,7 +869,9 @@ export async function assignTask({ taskId, body, userId }) {
     if (task.assigneeId === assigneeId) {
       return tx.task.findUnique({
         where: { id: taskId },
-        include: { assignee: { select: { id: true, name: true, email: true } } },
+        include: {
+          assignee: { select: { id: true, name: true, email: true } },
+        },
       });
     }
 
@@ -797,7 +881,17 @@ export async function assignTask({ taskId, body, userId }) {
       include: { assignee: { select: { id: true, name: true, email: true } } },
     });
 
-    await recordTaskActivity(tx, { taskId, actorId: userId, changes: [{ field: "assigneeId", oldValue: task.assigneeId, newValue: assigneeId }] });
+    await recordTaskActivity(tx, {
+      taskId,
+      actorId: userId,
+      changes: [
+        {
+          field: "assigneeId",
+          oldValue: task.assigneeId,
+          newValue: assigneeId,
+        },
+      ],
+    });
     await notificationService.notifyTaskAssigned(taskId, tx, userId);
     return updated;
   });

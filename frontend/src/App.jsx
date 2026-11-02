@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import "./App.css";
+import "./features.css";
+import AdminPanel from "./components/AdminPanel.jsx";
 import "./theme.css";
 import ThemeToggle from "./components/ThemeToggle.jsx";
 import { readTheme, saveTheme, THEME_STORAGE_KEY } from "./lib/theme.js";
@@ -19,6 +21,10 @@ const TOKEN_STORAGE_KEY = "taskflow.token";
 const SESSION_EXPIRED_NOTICE = "Your session has expired. Please log in again.";
 
 const pages = {
+  admin: {
+    title: "Administration",
+    description: "User access and security events.",
+  },
   home: {
     title: "Overview",
     description: "A little clarity for the work ahead.",
@@ -242,24 +248,26 @@ export default function App() {
         </div>
         <nav aria-label="Main navigation">
           <p className="nav-heading">WORKSPACE</p>
-          {Object.keys(pages).map((key) => (
-            <a
-              key={key}
-              href={`#/${key}`}
-              className={`nav-item ${page === key ? "active" : ""}`}
-              aria-current={page === key ? "page" : undefined}
-            >
-              <WorkspaceIcon name={key} />
-              <span>
-                {key === "home"
-                  ? "Overview"
-                  : key === "profile"
-                    ? "Profile"
-                    : pages[key].title}
-              </span>
-              {page === key && <span className="nav-active-dot" />}
-            </a>
-          ))}
+          {Object.keys(pages)
+            .filter((key) => key !== "admin" || user.role === "ADMIN")
+            .map((key) => (
+              <a
+                key={key}
+                href={`#/${key}`}
+                className={`nav-item ${page === key ? "active" : ""}`}
+                aria-current={page === key ? "page" : undefined}
+              >
+                <WorkspaceIcon name={key} />
+                <span>
+                  {key === "home"
+                    ? "Overview"
+                    : key === "profile"
+                      ? "Profile"
+                      : pages[key].title}
+                </span>
+                {page === key && <span className="nav-active-dot" />}
+              </a>
+            ))}
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-note">
@@ -326,6 +334,31 @@ export default function App() {
               <span /> Team workspace
             </span>
           </div>
+          <section
+            aria-label="Task browser screen"
+            hidden={page !== "explorer"}
+          >
+          </section>
+          <section aria-label="Administration screen" hidden={page !== "admin"}>
+            {user.role === "ADMIN" ? (
+              <AdminPanel
+                token={token}
+                userId={user.id}
+                onSessionExpired={handleSessionExpired}
+              />
+            ) : page === "admin" ? (
+              <p role="alert">Administrator access is required.</p>
+            ) : null}
+          </section>
+          <section aria-label="Today screen" hidden={page !== "today"}>
+          </section>
+          <section aria-label="Dashboard screen" hidden={page !== "dashboard"}>
+          </section>
+          <section
+            aria-label="Project settings screen"
+            hidden={page !== "management"}
+          >
+          </section>
           <section aria-label="Overview screen" hidden={page !== "home"}>
             <WorkspaceHome user={user} />
           </section>

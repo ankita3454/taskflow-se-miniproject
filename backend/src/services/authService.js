@@ -24,16 +24,23 @@ export class AuthError extends Error {
   }
 }
 
-const emailInUse = () => new AuthError(409, "EMAIL_IN_USE", "E-mail already in use");
+const emailInUse = () =>
+  new AuthError(409, "EMAIL_IN_USE", "E-mail already in use");
 const invalidCredentials = () =>
   new AuthError(401, "INVALID_CREDENTIALS", "Invalid e-mail or password");
 
 function isUniqueViolation(error) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
 }
 
 function isRecordNotFound(error) {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2025"
+  );
 }
 
 /**
@@ -52,7 +59,9 @@ export async function registerUser(body) {
   const normalisedEmail = normaliseEmail(email);
 
   // Fast path: skip the bcrypt work when the e-mail is obviously taken.
-  const existing = await prisma.user.findUnique({ where: { email: normalisedEmail } });
+  const existing = await prisma.user.findUnique({
+    where: { email: normalisedEmail },
+  });
   if (existing) {
     throw emailInUse();
   }
@@ -105,7 +114,9 @@ export async function authenticateUser(body) {
     throw invalidCredentials();
   }
 
-  const user = await prisma.user.findUnique({ where: { email: normaliseEmail(email) } });
+  const user = await prisma.user.findUnique({
+    where: { email: normaliseEmail(email) },
+  });
   if (!user || !user.active) {
     throw invalidCredentials();
   }
@@ -141,7 +152,9 @@ export async function updateOwnProfile(id, body) {
 
   const unknown = submitted.filter((key) => !PROFILE_FIELDS.has(key));
   if (unknown.length > 0) {
-    throw new ValidationError(`Only name and password can be updated (got: ${unknown.join(", ")})`);
+    throw new ValidationError(
+      `Only name and password can be updated (got: ${unknown.join(", ")})`,
+    );
   }
   if (submitted.length === 0) {
     throw new ValidationError("Provide a name or a password to update");
@@ -171,6 +184,6 @@ export async function updateOwnProfile(id, body) {
 
 /** SEC-05: strips passwordHash (and any other internal field) before a response ever sees it. */
 function toPublicUser(user) {
-  const { passwordHash: _passwordHash, ...publicUser } = user;
-  return publicUser;
+  const { id, name, email, role, active } = user;
+  return { id, name, email, role, active };
 }

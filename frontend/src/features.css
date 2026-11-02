@@ -1,0 +1,146 @@
+.feature-stack {
+  display: grid;
+  gap: 20px;
+}
+.feature-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+}
+.feature-card h2 {
+  margin-bottom: 12px;
+  font-size: 20px;
+}
+.feature-card h3 {
+  margin: 14px 0 9px;
+}
+.feature-controls {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: end;
+  margin: 18px 0;
+}
+.feature-controls label {
+  flex: 1;
+  min-width: 150px;
+}
+.feature-controls select,
+.feature-controls input {
+  margin-top: 6px;
+}
+.feature-table-wrap {
+  overflow: auto;
+  margin-top: 18px;
+}
+.feature-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+.feature-table td,
+.feature-table th {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.feature-table td select {
+  min-width: 110px;
+}
+.feature-table td button {
+  white-space: nowrap;
+  font-size: 12px;
+}
+.feature-history li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+[data-theme="dark"] .feature-card {
+  background: #192a23;
+}
+@media (max-width: 700px) {
+  .feature-card {
+    padding: 18px;
+  }
+}
+.feature-kanban {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(230px, 1fr));
+  gap: 14px;
+  overflow-x: auto;
+  margin-top: 18px;
+}
+.feature-kanban > section {
+  min-width: 0;
+}
+.feature-task {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 15px;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.feature-task p {
+  margin: 8px 0;
+}
+.feature-task-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 15px;
+}
+.feature-tags {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.feature-tags > span {
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--cream);
+  color: var(--ink);
+  font-size: 12px;
+}
+.feature-tags button {
+  font-size: 12px;
+  padding: 5px 8px;
+}
+.feature-card > .auth-form {
+  max-width: 650px;
+  margin: 20px 0;
+}
+.feature-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin: 22px 0;
+}
+.feature-metrics article {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.feature-metrics strong {
+  font-size: 28px;
+  color: var(--ink);
+}
+.feature-chart {
+  width: 100%;
+  height: auto;
+  margin-top: 18px;
+  color: var(--muted);
+}
+@media (max-width: 700px) {
+  .feature-metrics {
+    grid-template-columns: 1fr;
+  }
+}

@@ -9,6 +9,7 @@ import {
 } from "../services/authService.js";
 import { ValidationError } from "../utils/validation.js";
 
+import { recordAudit } from "../sprint2/security.js";
 const router = Router();
 
 function handle(fn) {
@@ -18,15 +19,24 @@ function handle(fn) {
     } catch (error) {
       if (error instanceof ValidationError) {
         return res.status(400).json({
-          error: { code: "VALIDATION_ERROR", message: error.message, fields: error.details },
+          error: {
+            code: "VALIDATION_ERROR",
+            message: error.message,
+            fields: error.details,
+          },
         });
       }
       if (error instanceof AuthError) {
-        return res.status(error.status).json({ error: { code: error.code, message: error.message } });
+        return res
+          .status(error.status)
+          .json({ error: { code: error.code, message: error.message } });
       }
       console.error(error);
       return res.status(500).json({
-        error: { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" },
+        error: {
+          code: "INTERNAL_SERVER_ERROR",
+          message: "An unexpected error occurred",
+        },
       });
     }
   };
@@ -45,7 +55,14 @@ router.post(
 router.post(
   "/login",
   handle(async (req, res) => {
-    const { token, user } = await authenticateUser(req.body);
+    let result;
+    try {
+      result = await authenticateUser(req.body);
+    } catch (error) {
+      await recordAudit("LOGIN_FAILED");
+      throw error;
+    }
+    const { token, user } = result;
     res.status(200).json({ token, user });
   }),
 );

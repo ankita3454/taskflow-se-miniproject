@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import "./features.css";
+import TaskExplorer from "./components/TaskExplorer.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
 import "./theme.css";
 import ThemeToggle from "./components/ThemeToggle.jsx";
@@ -21,6 +22,10 @@ const TOKEN_STORAGE_KEY = "taskflow.token";
 const SESSION_EXPIRED_NOTICE = "Your session has expired. Please log in again.";
 
 const pages = {
+  explorer: {
+    title: "Task browser",
+    description: "Search, organise and inspect your project tasks.",
+  },
   admin: {
     title: "Administration",
     description: "User access and security events.",
@@ -338,6 +343,15 @@ export default function App() {
             aria-label="Task browser screen"
             hidden={page !== "explorer"}
           >
+            {page === "explorer" && (
+              <TaskExplorer
+                key={user.id}
+                token={token}
+                userId={user.id}
+                onSessionExpired={handleSessionExpired}
+                projectRevision={projectRevision}
+              />
+            )}
           </section>
           <section aria-label="Administration screen" hidden={page !== "admin"}>
             {user.role === "ADMIN" ? (

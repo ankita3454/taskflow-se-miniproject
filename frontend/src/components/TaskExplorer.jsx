@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import TaskConversation from "./TaskConversation.jsx";
 import { api } from "../lib/api.js";
 import { featureRequest, queryString } from "../lib/sprint2-api.js";
 const statuses = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
@@ -354,6 +355,7 @@ export default function TaskExplorer({
           tags={tags}
           setTags={setTags}
           owner={owner}
+          token={token}
           userId={userId}
           busy={busy}
           mutate={mutate}
@@ -370,6 +372,7 @@ function TaskDetails({
   tags,
   setTags,
   owner,
+  token,
   userId,
   busy,
   mutate,
@@ -589,6 +592,7 @@ function TaskDetails({
           <button disabled={busy}>Save task details</button>
         </form>
       )}
+      <TaskConversation taskId={task.id} token={token} />
       {owner && (
         <button disabled={busy} onClick={onDelete}>
           Delete task permanently

@@ -11,6 +11,7 @@ import securityRoutes from "./sprint2/security.routes.js";
 import { createLoginLimiter, recordAudit } from "./sprint2/security.js";
 
 import taskFeatures from "./sprint2/tasks.routes.js";
+import collaborationRoutes from "./sprint2/collaboration.routes.js";
 const app = express();
 
 app.use(
@@ -34,6 +35,7 @@ app.use("/api/v1/admin", securityRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1", taskRoutes);
 app.use("/api/v1", taskFeatures);
+app.use("/api/v1", collaborationRoutes);
 app.use("/api/v1/projects", projectRoutes);
 app.use("/api/v1", invitationRoutes);
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import "./features.css";
+import ProjectManagement from "./components/ProjectManagement.jsx";
 import TaskExplorer from "./components/TaskExplorer.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
 import "./theme.css";
@@ -22,6 +23,10 @@ const TOKEN_STORAGE_KEY = "taskflow.token";
 const SESSION_EXPIRED_NOTICE = "Your session has expired. Please log in again.";
 
 const pages = {
+  management: {
+    title: "Project settings",
+    description: "Membership, ownership and archiving.",
+  },
   explorer: {
     title: "Task browser",
     description: "Search, organise and inspect your project tasks.",
@@ -372,6 +377,15 @@ export default function App() {
             aria-label="Project settings screen"
             hidden={page !== "management"}
           >
+            {page === "management" && (
+              <ProjectManagement
+                key={user.id}
+                token={token}
+                userId={user.id}
+                onProjectsChanged={handleProjectsChanged}
+                onSessionExpired={handleSessionExpired}
+              />
+            )}
           </section>
           <section aria-label="Overview screen" hidden={page !== "home"}>
             <WorkspaceHome user={user} />

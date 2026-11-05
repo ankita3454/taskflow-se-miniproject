@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import "./features.css";
+import DashboardPanel, { TodayPanel } from "./components/DashboardPanel.jsx";
 import ProjectManagement from "./components/ProjectManagement.jsx";
 import TaskExplorer from "./components/TaskExplorer.jsx";
 import AdminPanel from "./components/AdminPanel.jsx";
@@ -23,6 +24,14 @@ const TOKEN_STORAGE_KEY = "taskflow.token";
 const SESSION_EXPIRED_NOTICE = "Your session has expired. Please log in again.";
 
 const pages = {
+  today: {
+    title: "Today",
+    description: "Your next steps across all projects.",
+  },
+  dashboard: {
+    title: "Project dashboard",
+    description: "Progress, workload, burndown and export.",
+  },
   management: {
     title: "Project settings",
     description: "Membership, ownership and archiving.",
@@ -370,8 +379,22 @@ export default function App() {
             ) : null}
           </section>
           <section aria-label="Today screen" hidden={page !== "today"}>
+            {page === "today" && (
+              <TodayPanel
+                token={token}
+                onSessionExpired={handleSessionExpired}
+              />
+            )}
           </section>
           <section aria-label="Dashboard screen" hidden={page !== "dashboard"}>
+            {page === "dashboard" && (
+              <DashboardPanel
+                token={token}
+                userId={user.id}
+                projectRevision={projectRevision}
+                onSessionExpired={handleSessionExpired}
+              />
+            )}
           </section>
           <section
             aria-label="Project settings screen"

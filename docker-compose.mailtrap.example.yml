@@ -1,0 +1,10 @@
+# Optional LOCAL override. Root .env supplies secrets; never commit actual values.
+# docker compose -f docker-compose.yml -f docker-compose.mailtrap.example.yml up -d --build
+services:
+  backend:
+    environment:
+      REMINDERS_ENABLED: "true"
+      MAILTRAP_HOST: sandbox.smtp.mailtrap.io
+      MAILTRAP_PORT: "2525"
+      MAILTRAP_USER: ${MAILTRAP_USER:?Set sandbox SMTP username locally}
+      MAILTRAP_PASSWORD: ${MAILTRAP_PASSWORD:?Set sandbox SMTP password locally}

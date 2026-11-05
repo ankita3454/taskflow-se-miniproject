@@ -5,3 +5,7 @@ node_modules/
 dist/
 coverage/
 *.log
+# Disposable Sprint 2 verification output (no credentials in commits)
+**/performance-results/
+docker-compose.override.yml
+docker-compose.mailtrap.local.yml

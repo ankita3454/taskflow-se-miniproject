@@ -400,8 +400,9 @@ export async function createTask({
   return createTaskIdempotently({ input, userId, key });
 }
 
-export async function listProjectTasks(projectId) {
-  return prisma.task.findMany({
+export async function listProjectTasks(projectId, db = prisma) {
+  return db.task.findMany({
+    relationLoadStrategy: "join",
     where: { projectId },
     orderBy: { createdAt: "desc" },
     include: TASK_INCLUDE,

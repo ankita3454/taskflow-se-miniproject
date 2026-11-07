@@ -21,9 +21,9 @@ app.use(
   }),
 );
 
-// Count malformed JSON attempts too: throttle before the body parser.
-app.post("/api/v1/auth/login", createLoginLimiter());
+const loginLimiter = createLoginLimiter();
 app.use(express.json());
+app.post("/api/v1/auth/login", loginLimiter);
 
 app.get("/api/v1/health", (_req, res) => {
   res.status(200).json({
@@ -52,22 +52,21 @@ app.use((_req, res) => {
   });
 });
 
-app.use(async (error, _req, res, _next) => {
+app.use(async (error, req, res, next) => {
   const invalidJson = error.type === "entity.parse.failed";
-  if (invalidJson && _req.path === "/api/v1/auth/login") {
-    try {
-      await recordAudit("LOGIN_FAILED");
-    } catch {
-      /* Respond without exposing storage errors. */
-    }
+  if (invalidJson && req.path === "/api/v1/auth/login") {
+    // Invalid JSON cannot carry a usable email, so it has its own bounded
+    // per-IP bucket. It must not bypass throttling or consume another account's quota.
+    return loginLimiter(req, res, async (limiterError) => {
+      if (limiterError) return next(limiterError);
+      try { await recordAudit("LOGIN_FAILED"); } catch { /* Do not expose storage errors. */ }
+      return res.status(400).json({ error: { code: "INVALID_JSON", message: "Invalid JSON request body" } });
+    });
   }
-
   res.status(invalidJson ? 400 : 500).json({
     error: {
       code: invalidJson ? "INVALID_JSON" : "INTERNAL_SERVER_ERROR",
-      message: invalidJson
-        ? "Invalid JSON request body"
-        : "An unexpected error occurred",
+      message: invalidJson ? "Invalid JSON request body" : "An unexpected error occurred",
     },
   });
 });

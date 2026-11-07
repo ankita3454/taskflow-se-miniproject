@@ -47,7 +47,7 @@ function isRecordNotFound(error) {
  * F1-REQ-01/02/03: register a new user with a unique e-mail and a bcrypt-hashed
  * password; never persists the plaintext password.
  */
-export async function registerUser(body) {
+export async function registerUser(body, db = prisma) {
   const { name, email, password } = asObject(body);
 
   assertValid({
@@ -59,7 +59,7 @@ export async function registerUser(body) {
   const normalisedEmail = normaliseEmail(email);
 
   // Fast path: skip the bcrypt work when the e-mail is obviously taken.
-  const existing = await prisma.user.findUnique({
+  const existing = await db.user.findUnique({
     where: { email: normalisedEmail },
   });
   if (existing) {
@@ -70,7 +70,7 @@ export async function registerUser(body) {
 
   let user;
   try {
-    user = await prisma.user.create({
+    user = await db.user.create({
       data: { name: name.trim(), email: normalisedEmail, passwordHash },
     });
   } catch (error) {
@@ -93,7 +93,7 @@ export async function registerUser(body) {
  * fails gets the SAME generic 401, whether the e-mail doesn't exist or the
  * password is wrong, so a caller can't enumerate valid accounts.
  */
-export async function authenticateUser(body) {
+export async function authenticateUser(body, db = prisma) {
   const { email, password } = asObject(body);
 
   if (
@@ -114,7 +114,7 @@ export async function authenticateUser(body) {
     throw invalidCredentials();
   }
 
-  const user = await prisma.user.findUnique({
+  const user = await db.user.findUnique({
     where: { email: normaliseEmail(email) },
   });
   if (!user || !user.active) {
@@ -131,8 +131,8 @@ export async function authenticateUser(body) {
 }
 
 /** F1-REQ-06: fetch the caller's own profile. */
-export async function getUserById(id) {
-  const user = await prisma.user.findUnique({ where: { id } });
+export async function getUserById(id, db = prisma) {
+  const user = await db.user.findUnique({ where: { id } });
   if (!user) {
     throw new AuthError(404, "NOT_FOUND", "User not found");
   }
@@ -146,7 +146,7 @@ const PROFILE_FIELDS = new Set(["name", "password"]);
  * field is validated (SEC-03); fields this endpoint doesn't own (email, role,
  * active, ...) are rejected rather than silently ignored.
  */
-export async function updateOwnProfile(id, body) {
+export async function updateOwnProfile(id, body, db = prisma) {
   const fields = asObject(body);
   const submitted = Object.keys(fields);
 
@@ -172,7 +172,7 @@ export async function updateOwnProfile(id, body) {
   }
 
   try {
-    const user = await prisma.user.update({ where: { id }, data });
+    const user = await db.user.update({ where: { id }, data });
     return toPublicUser(user);
   } catch (error) {
     if (isRecordNotFound(error)) {

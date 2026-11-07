@@ -1,0 +1,97 @@
+{
+  "recordedAt": "2026-11-07T17:46:41.609Z",
+  "environment": {
+    "os": "6.18.56",
+    "platform": "linux",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.90GHz",
+    "logicalCpus": 2,
+    "memoryBytes": 4492595200,
+    "node": "v24.22.1"
+  },
+  "method": "Autocannon, same-process Express listener plus real PostgreSQL; closed-loop; separate operations; response-event latencies sorted with nearest-rank p95; no warmup exclusion.",
+  "dataset": {
+    "tasks": 1000,
+    "users": 20,
+    "projectCount": 1
+  },
+  "results": [
+    {
+      "operation": "list",
+      "concurrentUsers": 1,
+      "distinctTokens": 1,
+      "durationSeconds": 5,
+      "requests": 200,
+      "errors": 0,
+      "timeouts": 0,
+      "non2xx": 0,
+      "p95Milliseconds": 31.814167,
+      "p99Milliseconds": 36,
+      "passed": true
+    },
+    {
+      "operation": "search",
+      "concurrentUsers": 1,
+      "distinctTokens": 1,
+      "durationSeconds": 5,
+      "requests": 851,
+      "errors": 0,
+      "timeouts": 0,
+      "non2xx": 0,
+      "p95Milliseconds": 6.463954,
+      "p99Milliseconds": 12,
+      "passed": true
+    },
+    {
+      "operation": "filter",
+      "concurrentUsers": 1,
+      "distinctTokens": 1,
+      "durationSeconds": 5,
+      "requests": 314,
+      "errors": 0,
+      "timeouts": 0,
+      "non2xx": 0,
+      "p95Milliseconds": 20.616539,
+      "p99Milliseconds": 26,
+      "passed": true
+    },
+    {
+      "operation": "list",
+      "concurrentUsers": 20,
+      "distinctTokens": 20,
+      "durationSeconds": 5,
+      "requests": 343,
+      "errors": 0,
+      "timeouts": 0,
+      "non2xx": 0,
+      "p95Milliseconds": 381.501218,
+      "p99Milliseconds": 438,
+      "passed": true
+    },
+    {
+      "operation": "search",
+      "concurrentUsers": 20,
+      "distinctTokens": 20,
+      "durationSeconds": 5,
+      "requests": 1596,
+      "errors": 0,
+      "timeouts": 0,
+      "non2xx": 0,
+      "p95Milliseconds": 79.147226,
+      "p99Milliseconds": 240,
+      "passed": true
+    },
+    {
+      "operation": "filter",
+      "concurrentUsers": 20,
+      "distinctTokens": 20,
+      "durationSeconds": 5,
+      "requests": 572,
+      "errors": 0,
+      "timeouts": 0,
+      "non2xx": 0,
+      "p95Milliseconds": 234.175094,
+      "p99Milliseconds": 290,
+      "passed": true
+    }
+  ]
+}

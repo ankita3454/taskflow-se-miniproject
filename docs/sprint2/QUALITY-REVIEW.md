@@ -4,9 +4,9 @@
   task/security/collaboration/dashboard/reminder service factories accept injectable
   repositories/transport. Routes contain HTTP adaptation, not business policy.
 - Testability: sprint2-service-units.test.js exercises repository mocks without
-  HTTP/PostgreSQL. Existing notification service mock tests also pass. Legacy Auth,
-  Project and Task modules still use imported Prisma directly; broad dependency-
-  injection refactoring is NOT claimed complete. Existing tests cover their behavior
+  HTTP/PostgreSQL. Existing notification service mock tests also pass. Auth and Project functions and Task list support optional injected database objects,
+  exercised by final-service-isolation.test.js. Task write functions still use the
+  imported Prisma singleton; broad dependency-injection refactoring is NOT claimed complete. Existing tests cover their behavior
   through service/API/database checks, which are not mock-isolation evidence.
 - Reliability: original 17 TaskWorkspace tests and creation-idempotency API tests
   remain; no assertions removed. Repeated/parallel reminder calls produce one claim

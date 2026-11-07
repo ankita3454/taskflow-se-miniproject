@@ -112,6 +112,9 @@ export default function App() {
   );
   const [notice, setNotice] = useState("");
   const [page, setPage] = useState(readPage);
+  // Mount the task workspace only after its first visit; keep it mounted
+  // afterwards so navigation never discards an unfinished form.
+  const [tasksVisited, setTasksVisited] = useState(() => readPage() === "tasks");
   const [notificationTarget, setNotificationTarget] = useState(null);
   const [projectRevision, setProjectRevision] = useState(0);
   const handleProjectsChanged = useCallback(
@@ -121,7 +124,9 @@ export default function App() {
 
   useEffect(() => {
     function handleHashChange() {
-      setPage(readPage());
+      const nextPage = readPage();
+      if (nextPage === "tasks") setTasksVisited(true);
+      setPage(nextPage);
     }
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
@@ -171,6 +176,7 @@ export default function App() {
     setToken(null);
     setUser(null);
     setAuthView("login");
+    setTasksVisited(false);
   }, []);
 
   // A protected request came back 401 (expired or invalid JWT): end the
@@ -422,12 +428,14 @@ export default function App() {
             />
           </section>
           <section aria-label="Tasks screen" hidden={page !== "tasks"}>
-            <TaskWorkspace
-              token={token}
-              userId={user.id}
-              onSessionExpired={handleSessionExpired}
-              projectRevision={projectRevision}
-            />
+            {(tasksVisited || page === "tasks") && (
+              <TaskWorkspace
+                token={token}
+                userId={user.id}
+                onSessionExpired={handleSessionExpired}
+                projectRevision={projectRevision}
+              />
+            )}
           </section>
           <section
             aria-label="Notifications screen"

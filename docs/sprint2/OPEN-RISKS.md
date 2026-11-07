@@ -4,7 +4,7 @@
 - #22: live Mailtrap sandbox delivery has not been executed; transport is tested with
   injected mail, not fabricated Mailtrap screenshots. Credentials must remain local.
 - #32: new Sprint 2 Docker runtime/second-runtime portability check remains pending.
-  Legacy Auth/Project/Task modules are not newly refactored to repository factories.
+  Auth and Project functions and Task list accept an optional injected database; Task write paths still use the imported Prisma singleton.
 - #28: functional security checks pass, but dependency audit is NOT clean. At package
   preparation, npm audit --omit=dev reports a high deepmerge-ts recursive-object DoS
   advisory through @prisma/config/Prisma 6; the suggested fix is a Prisma major upgrade.
@@ -40,5 +40,8 @@
 - Browser walkthrough selector matched a hidden second project label. Scoped the
   test to the visible project card; added finally cleanup lookup; smoke rerun passed.
 
-- Login throttling was moved ahead of JSON parsing so malformed JSON cannot bypass
-  the limit; the security API regression test verifies 429 for that bypass attempt.
+- Login throttling now follows JSON parsing to distinguish accounts. Malformed JSON is
+  throttled separately in the parser error path; the security regression test checks 429.
+
+- Original Windows evidence shows 20-user task listing p95 2319.49 ms and 2 of 5 dashboard runs over 2000 ms. This follow-up changes those paths; repeat the checks on Windows before claiming their targets are met.
+- Per-IP-and-email login limiting avoids blocking other accounts behind a shared proxy, but distributed source IPs or many distinct emails can evade a single bucket. Account-targeted lockout remains possible; a shared, layered limiter is needed for multi-instance production.

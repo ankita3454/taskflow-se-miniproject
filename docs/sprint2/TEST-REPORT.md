@@ -32,3 +32,6 @@ remote commits, pushes, reviews or merges are performed by the delivery bundle.
 
 The pack covers the expanded recovery backlog, including features originally
 planned for later sprints; it does not change original sprint deadlines.
+
+## Final follow-up
+See FINAL-FOLLOWUP.md and the `*-followup-linux.json` evidence for the later fixes, tests and remaining target-environment checks. The earlier results above remain historical.

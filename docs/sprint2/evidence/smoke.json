@@ -1,0 +1,36 @@
+{
+  "recordedAt": "2026-11-01T05:54:42.694Z",
+  "browser": "153.0.8010.12",
+  "results": [
+    {
+      "check": "New-user project and first task",
+      "passed": true,
+      "primaryScreens": 2,
+      "screens": [
+        "Projects",
+        "Tasks"
+      ],
+      "note": "Authenticated disposable test account; registration/login not counted as work screens. Three including registration."
+    },
+    {
+      "check": "Task details and immutable comment history",
+      "passed": true
+    },
+    {
+      "check": "Project settings screen",
+      "passed": true
+    },
+    {
+      "check": "Today screen",
+      "passed": true
+    },
+    {
+      "check": "Administration screen",
+      "passed": true
+    },
+    {
+      "check": "No browser JavaScript errors",
+      "passed": true
+    }
+  ]
+}

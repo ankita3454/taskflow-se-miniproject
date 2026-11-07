@@ -1,0 +1,45 @@
+{
+  "recordedAt": "2026-11-07T17:17:48.740Z",
+  "browser": "156.0.8078.4",
+  "node": "v24.7.0",
+  "platform": "win32",
+  "os": "10.0.26200",
+  "cpu": "Intel(R) Core(TM) i7-8665U CPU @ 1.90GHz",
+  "method": "Five fresh browser contexts (cold HTTP cache); production Vite preview; navigation through token restore, project fetch, metrics/workload and SVG burndown render, correct 125/500 and 25%, then two animation frames. No network/CPU throttling; local network. No concurrent background load.",
+  "dataset": {
+    "tasks": 500,
+    "members": 20
+  },
+  "results": [
+    {
+      "run": 1,
+      "milliseconds": 1708.7,
+      "errors": [],
+      "passed": true
+    },
+    {
+      "run": 2,
+      "milliseconds": 1853.44,
+      "errors": [],
+      "passed": true
+    },
+    {
+      "run": 3,
+      "milliseconds": 1819.49,
+      "errors": [],
+      "passed": true
+    },
+    {
+      "run": 4,
+      "milliseconds": 2175.83,
+      "errors": [],
+      "passed": false
+    },
+    {
+      "run": 5,
+      "milliseconds": 2047.97,
+      "errors": [],
+      "passed": false
+    }
+  ]
+}

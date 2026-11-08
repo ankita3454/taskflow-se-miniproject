@@ -37,3 +37,7 @@
 
 - Original Windows evidence shows 20-user task listing p95 2319.49 ms and 2 of 5 dashboard runs over 2000 ms. This follow-up changes those paths; repeat the checks on Windows before claiming their targets are met.
 - Per-IP-and-email login limiting avoids blocking other accounts behind a shared proxy, but distributed source IPs or many distinct emails can evade a single bucket. Account-targeted lockout remains possible; a shared, layered limiter is needed for multi-instance production.
+- The Mailtrap free sandbox permits one email per 10 seconds. Sandbox sends are now
+  paced per process before opening the sending transaction; different processes and
+  external clients sharing a sandbox are not coordinated. Test live and run a single
+  reminder worker, or implement a shared limiter for multi-worker use.

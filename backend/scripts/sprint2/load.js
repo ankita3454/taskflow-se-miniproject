@@ -16,16 +16,35 @@ await new Promise((r) => server.once("listening", r));
 const f = await fixture();
 const results = [];
 const duration = Number(process.env.LOAD_DURATION_SECONDS || 5);
+let benchmarkTag;
 try {
-  for (const users of [1, 20])
-    for (const [operation, path] of [
+  const operations = [
       ["list", `/projects/${f.project.id}/tasks`],
       ["search", `/projects/${f.project.id}/task-query?q=needle`],
       [
         "filter",
         `/projects/${f.project.id}/task-query?status=TODO&priority=LOW&sort=dueDate&direction=asc`,
       ],
-    ]) {
+    ];
+  if (process.env.LOAD_EXTRA_FILTERS === 'yes') {
+    benchmarkTag = await db.tag.create({ data: { projectId: f.project.id, name: 'Benchmark tag', normalizedName: 'benchmark tag' } });
+    const taggedTasks = await db.task.findMany({ where: { projectId: f.project.id }, take: 100, select: { id: true } });
+    await db.taskTag.createMany({ data: taggedTasks.map((task) => ({ taskId: task.id, tagId: benchmarkTag.id })) });
+    const start = f.project.sprintStart.toISOString().slice(0, 10);
+    const end = f.project.sprintEnd.toISOString().slice(0, 10);
+    operations.push(
+      ['search-title', `/projects/${f.project.id}/task-query?q=Benchmark%20task%209`],
+      ['filter-status', `/projects/${f.project.id}/task-query?status=TODO`],
+      ['filter-priority', `/projects/${f.project.id}/task-query?priority=LOW`],
+      ['filter-assignee', `/projects/${f.project.id}/task-query?assignee=${f.users[0].id}`],
+      ['filter-tag', `/projects/${f.project.id}/task-query?tag=${benchmarkTag.id}`],
+      ['filter-from', `/projects/${f.project.id}/task-query?from=${end}`],
+      ['filter-to', `/projects/${f.project.id}/task-query?to=${start}`],
+      ['filter-date-range', `/projects/${f.project.id}/task-query?from=${start}&to=${end}`],
+    );
+  }
+  for (const users of [1, 20])
+    for (const [operation, path] of operations) {
       // One connection per distinct authenticated user, no pipelining. Requests run
       // closed-loop without think time; each operation is measured separately.
       let index = 0;
@@ -98,6 +117,7 @@ try {
   await writeFile(output, JSON.stringify(report, null, 2));
   if (results.some((r) => !r.passed)) process.exitCode = 1;
 } finally {
+  if (benchmarkTag) await db.tag.deleteMany({ where: { id: benchmarkTag.id } });
   await f.cleanup();
   await db.$disconnect();
   await new Promise((r) => server.close(r));

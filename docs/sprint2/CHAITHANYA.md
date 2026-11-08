@@ -42,3 +42,13 @@ Repeat at interval 1 (use a separate task/due date or the real later day). Verif
 Done task gets none. Redact credentials in screenshots. Actual Mailtrap acceptance
 is pending until this is done. Mock-mail concurrency/timing tests already pass.
 #30 production-browser performance verification follows in package 08.
+
+## Mailtrap free-tier pacing follow-up
+Mailtrap's free sandbox accepts one email per 10 seconds. The sandbox sender now
+serializes attempts in each process, leaving at least 10.5 seconds between completed
+attempts. Waiting occurs before the sending transaction opens, so that delay does not
+hold a project lock. The task/interval claim remains durable and an ambiguous delivery
+is not retried automatically. This in-process limiter does not coordinate multiple
+backend processes or external senders sharing the same sandbox; use a single worker or
+add a shared rate limiter for that deployment. SMTP quota and other failures can still
+produce an UNKNOWN claim that requires investigation. Live sandbox retest is required.

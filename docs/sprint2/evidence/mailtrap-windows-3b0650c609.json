@@ -1,0 +1,20 @@
+{
+  "marker": "TF-CHECK-c9081c5b",
+  "mode": "live",
+  "recordedAt": "2026-11-08T04:27:58.507Z",
+  "firstRun": {
+    "sent": 2,
+    "skipped": 0,
+    "uncertain": 0
+  },
+  "secondRun": {
+    "sent": 0,
+    "skipped": 2,
+    "uncertain": 0
+  },
+  "reminderRecords": 2,
+  "notificationRecords": 2,
+  "doneTaskReminders": 0,
+  "databaseChecksPassed": true,
+  "sandboxInboxManuallyVerified": false
+}

@@ -2,6 +2,33 @@ import nodemailer from "nodemailer";
 import prisma from "../repositories/prisma.js";
 import { utcToday } from "./dashboard.js";
 import { lockProject } from "./common.js";
+// The free Mailtrap sandbox accepts one message per 10 seconds. Serialize
+// attempts before opening the send transaction, so waiting never holds a DB lock.
+// This queue is process-local; separate workers need shared coordination.
+export function createSendPacer({
+  intervalMs = 10500,
+  now = Date.now,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+} = {}) {
+  let tail = Promise.resolve();
+  let nextAllowedAt = 0;
+  return (operation) => {
+    const run = async () => {
+      const delay = nextAllowedAt - now();
+      if (delay > 0) await sleep(delay);
+      try {
+        return await operation();
+      } finally {
+        nextAllowedAt = now() + intervalMs;
+      }
+    };
+    const result = tail.then(run, run);
+    tail = result.then(() => undefined, () => undefined);
+    return result;
+  };
+}
+
+const sandboxSendPacer = createSendPacer();
 export function mailtrapSender(env = process.env) {
   const host = env.MAILTRAP_HOST || "sandbox.smtp.mailtrap.io",
     port = Number(env.MAILTRAP_PORT || 2525);
@@ -23,7 +50,9 @@ export function mailtrapSender(env = process.env) {
     connectionTimeout: 10000,
     socketTimeout: 15000,
   });
-  return (message) => transport.sendMail(message);
+  const send = (message) => transport.sendMail(message);
+  send.runWithPacing = sandboxSendPacer;
+  return send;
 }
 export function createReminderService(db = prisma, sendMail) {
   return async function run(now = new Date()) {
@@ -96,7 +125,7 @@ export function createReminderService(db = prisma, sendMail) {
         continue;
       }
       try {
-        const sent = await db.$transaction(
+        const sendTransaction = () => db.$transaction(
           async (tx) => {
             await lockProject(tx, claim.projectId);
             const task = await tx.task.findUnique({
@@ -145,6 +174,9 @@ export function createReminderService(db = prisma, sendMail) {
           },
           { timeout: 30000 },
         );
+        const sent = sendMail?.runWithPacing
+          ? await sendMail.runWithPacing(sendTransaction)
+          : await sendTransaction();
         if (sent) result.sent++;
         else result.skipped++;
       } catch {

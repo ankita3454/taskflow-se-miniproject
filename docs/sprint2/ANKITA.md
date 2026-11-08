@@ -10,10 +10,11 @@ apply to direct requests. Deactivation requires confirmation.
 Audit GET filters `event`, `from`, `to` (UTC inclusive days), newest first, up to
 1,000 entries. There is no audit mutation API. Failed-login actor is null. No
 passwords, hashes, credentials or submitted email values enter the audit record.
-Login limit: 10 attempts/IP/15 minutes, 429 and Retry-After; only the core test
-runner raises its own limit so unrelated registration/login tests do not exhaust it.
-Production defaults are not weakened. Header spoofing does not choose req.ip;
-Express trust proxy stays disabled. This is a bounded, single-process limiter.
+Login limit: 10 failed or in-flight attempts per IP and normalized email in 15 minutes,
+with 429 and Retry-After. Successful login reservations are released. Malformed JSON
+uses a separate IP-scoped invalid-input bucket. The core test runner raises its own limit.
+Express trust proxy stays disabled: forwarded IP headers are not trusted. This is a bounded,
+single-process limiter, not a distributed or global per-account brute-force defense.
 
 If no active Admin exists, the database operator can deliberately bootstrap the
 FIRST Admin: register the intended account, then in backend PowerShell set
@@ -23,9 +24,9 @@ FIRST Admin: register the intended account, then in backend PowerShell set
 It refuses when an active Admin exists. Never commit credentials or .env.
 
 Evidence: security API/service tests, limiter clock/capacity tests, Admin UI tests.
-The lockfile updates body-parser 2.3.0 to 2.4.0. Remaining transitive Prisma/audit
-findings must be reviewed (OPEN-RISKS.md in package 07). Do not claim a clean
-security audit or close #28 solely because functional tests pass.
+The lockfile updates body-parser and applies a targeted override for the Prisma config
+deepmerge-ts advisory. See OPEN-RISKS.md for audit scope, remaining development-tool
+findings and the compatibility risk of overriding a pinned major dependency.
 
 ## Security review map (not a penetration-test certification)
 
@@ -37,7 +38,7 @@ security audit or close #28 solely because functional tests pass.
 | SEC-04 | Existing requireAuth re-reads account/role; new routers mount it before handlers; missing/tampered/expired and outsider cases covered |
 | SEC-05 | Public account selection excludes passwordHash/sessionVersion; audit has no submitted credentials |
 | SEC-06 | Failed login, role and account-status events are persisted; audit route read-only and Admin-only |
-| SEC-07 | Login limiter runs before JSON parsing, so malformed payloads cannot bypass it; threshold/recovery/Retry-After tests |
+| SEC-07 | Login limiter also handles malformed JSON in the parser error path; threshold/recovery/Retry-After tests |
 
 Review deployment proxy/rate-store assumptions and the dependency findings separately.
 No broad claim of zero vulnerabilities, complete penetration testing or certification.

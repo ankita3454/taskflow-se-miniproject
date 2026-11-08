@@ -26,7 +26,7 @@ const projectFields = {
   archived: true,
 };
 
-export async function createProject(ownerId, body) {
+export async function createProject(ownerId, body, db = prisma) {
   const fields = asObject(body);
   const unknown = Object.keys(fields).filter((key) => key !== "name");
   if (unknown.length > 0) {
@@ -35,7 +35,7 @@ export async function createProject(ownerId, body) {
   assertValid({ name: validateProjectName(fields.name) });
 
   try {
-    return await prisma.project.create({
+    return await db.project.create({
       data: {
         name: fields.name.trim(),
         ownerId,
@@ -56,8 +56,8 @@ export async function createProject(ownerId, body) {
   }
 }
 
-export async function getProjectsForMember(userId) {
-  return prisma.project.findMany({
+export async function getProjectsForMember(userId, db = prisma) {
+  return db.project.findMany({
     where: { members: { some: { userId } } },
     orderBy: { name: "asc" },
     select: projectFields,

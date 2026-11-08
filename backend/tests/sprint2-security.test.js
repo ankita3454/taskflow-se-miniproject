@@ -3,6 +3,7 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 process.env.JWT_SECRET ??= "sprint2-test-only";
 process.env.LOGIN_RATE_LIMIT = "3";
 const { default: app } = await import("../src/app.js");
@@ -173,20 +174,32 @@ test("failed login and API rate limiting are recorded without credentials", asyn
   });
   assert.equal(limited.status, 429);
   assert.ok(Number(limited.headers.get("retry-after")) > 0);
-  const malformed = await fetch(base + "/auth/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: "{",
-  });
-  assert.equal(
-    malformed.status,
-    429,
-    "Malformed JSON cannot bypass the limiter",
-  );
+  for (let i = 0; i < 4; i++) {
+    const malformed = await fetch(base + "/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+    assert.equal(malformed.status, i < 3 ? 400 : 429,
+      "Malformed requests use their own bounded IP bucket");
+  }
   const audit = await call("/admin/audit?event=LOGIN_FAILED");
   assert.ok(audit.data.entries.length >= 4);
   for (const e of audit.data.entries) assert.equal(e.actorId, null);
   assert.ok(!JSON.stringify(audit.data).includes("wrong-secret"));
+});
+test("successful sign-ins do not exhaust the shared proxy address, and accounts have independent quotas", async () => {
+  const password = "test-only-local-password";
+  const hash = await bcrypt.hash(password, 4);
+  await db.user.update({ where: { id: admin.id }, data: { passwordHash: hash } });
+  await db.user.update({ where: { id: member.id }, data: { passwordHash: hash } });
+  const login = (email, value = password) => call("/auth/login", {
+    method: "POST", token: null, body: { email, password: value },
+  });
+  for (let i = 0; i < 6; i++) assert.equal((await login(admin.email)).status, 200);
+  for (let i = 0; i < 3; i++) assert.equal((await login(admin.email, "wrong")).status, 401);
+  assert.equal((await login(admin.email)).status, 429);
+  assert.equal((await login(member.email)).status, 200);
 });
 test("limiter resets after the configured window and fails closed at capacity", async () => {
   let time = 0,
@@ -200,6 +213,7 @@ test("limiter resets after the configured window and fails closed at capacity", 
   const req = { ip: "127.0.0.1" };
   const response = {
     statusCode: 200,
+    once() { return this; },
     status(s) {
       this.statusCode = s;
       return this;

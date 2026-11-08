@@ -42,8 +42,9 @@ from the SRS. They were authorized by the project coordinator in the preparation
   never included in a ZIP or committed. Actual Mailtrap evidence must be collected separately.
 - Failed-login audit actor is null (unauthenticated), including known-email failures; no
   invented user is attributed. No passwords, hashes, email inputs or token values are logged.
-- Login limit defaults to 10 requests/IP/15 minutes, configured server-side, with Retry-After.
-  Single-process store is bounded; multi-replica deployment requires a shared limiter store.
+- Login limit defaults to 10 failed or in-flight attempts per IP and normalized email per
+  15 minutes, with Retry-After. Malformed JSON has a separate IP bucket; successful logins
+  release reservations. This bounded, single-process store is not a distributed defense.
 - Deactivation increments a session version. Reactivation requires fresh login; old sessions
   never become valid again. Legacy tokens without a version are treated as version zero.
 - Functional tests are not performance/portability evidence. Hardware, load dataset, observed

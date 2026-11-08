@@ -1,4 +1,5 @@
 import prisma from "../repositories/prisma.js";
+import { createHash } from "node:crypto";
 import { fail, object, uuid, dateOnly } from "./common.js";
 export const publicFields = {
   id: true,
@@ -113,42 +114,39 @@ export function createLoginLimiter({
     throw new Error("Invalid login limiter configuration");
   const buckets = new Map();
   return async function loginLimiter(req, res, next) {
-    const time = now(),
-      key = req.ip;
-    for (const [ip, b] of buckets) if (time >= b.until) buckets.delete(ip);
+    const time = now();
+    // Do not trust forwarded IP headers. In Docker nginx is the apparent IP;
+    // separating accounts prevents one person's logins blocking all others.
+    // Hash the address and normalized email so raw email is not kept in the map.
+    const email = typeof req.body?.email === "string"
+      ? req.body.email.trim().toLowerCase().slice(0, 255)
+      : "<invalid>";
+    const key = createHash("sha256").update(`${req.ip}\0${email}`).digest("hex");
+    for (const [id, b] of buckets) if (time >= b.until) buckets.delete(id);
     let bucket = buckets.get(key);
     if (!bucket) {
-      // Saturation fails closed; it must not evict live limits and permit a bypass.
+      // Saturation fails closed instead of evicting live limits.
       if (buckets.size >= maxKeys)
-        return res
-          .status(429)
-          .set("Retry-After", String(Math.ceil(windowMs / 1000)))
-          .json({
-            error: { code: "RATE_LIMITED", message: "Please try again later" },
-          });
+        return res.status(429).set("Retry-After", String(Math.ceil(windowMs / 1000)))
+          .json({ error: { code: "RATE_LIMITED", message: "Please try again later" } });
       bucket = { count: 0, until: time + windowMs };
       buckets.set(key, bucket);
     }
-    bucket.count++;
-    if (bucket.count > limit) {
-      try {
-        await recordAudit("LOGIN_FAILED");
-      } catch (e) {
-        return next(e);
-      }
-      return res
-        .status(429)
-        .set(
-          "Retry-After",
-          String(Math.max(1, Math.ceil((bucket.until - time) / 1000))),
-        )
-        .json({
-          error: {
-            code: "RATE_LIMITED",
-            message: "Too many login attempts. Please try again later.",
-          },
-        });
+    if (bucket.count >= limit) {
+      try { await recordAudit("LOGIN_FAILED"); } catch (e) { return next(e); }
+      return res.status(429)
+        .set("Retry-After", String(Math.max(1, Math.ceil((bucket.until - time) / 1000))))
+        .json({ error: { code: "RATE_LIMITED", message: "Too many login attempts. Please try again later." } });
     }
+    // Reserve an attempt before processing so concurrent guesses cannot bypass
+    // the limit. Successful responses release their reservation; failures retain it.
+    bucket.count++;
+    res.once("finish", () => {
+      if (res.statusCode < 400 && buckets.get(key) === bucket) {
+        bucket.count--;
+        if (bucket.count === 0) buckets.delete(key);
+      }
+    });
     next();
   };
 }

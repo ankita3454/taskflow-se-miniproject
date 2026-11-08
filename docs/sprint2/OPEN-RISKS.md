@@ -3,16 +3,8 @@
 ## Do not silently close these acceptance gaps
 - #22: live Mailtrap sandbox delivery has not been executed; transport is tested with
   injected mail, not fabricated Mailtrap screenshots. Credentials must remain local.
-- #32: new Sprint 2 Docker runtime/second-runtime portability check remains pending.
-  Legacy Auth/Project/Task modules are not newly refactored to repository factories.
-- #28: functional security checks pass, but dependency audit is NOT clean. At package
-  preparation, npm audit --omit=dev reports a high deepmerge-ts recursive-object DoS
-  advisory through @prisma/config/Prisma 6; the suggested fix is a Prisma major upgrade.
-  Do not apply npm audit fix --force blindly (Prisma 7 has compatibility changes).
-  Review exposure/upgrade in a focused follow-up with migration/runtime regressions.
-  Dev-only tooling also has warnings (Jest/Autocannon chains and frontend ESLint).
-  body-parser was updated to 2.4.0 to remove its known production finding; all tests
-  were rerun afterward. Rerun audits: the registry/advisory state changes over time.
+- #32: new Sprint 2 Docker runtime/second-runtime portability check remains pending. Auth, Project and Task service entrypoints accept an injectable database; notification services use injectable repositories.
+- #28: The Prisma config deepmerge-ts advisory is mitigated by a scoped npm override to 8.0.2. This is a major-version override of Prisma 6's exact dependency pin; validate Prisma generation/migration and application behavior on dependency upgrades. Production-only audit had zero findings, while the full backend audit reported 3 low and 19 moderate development-tool findings. Recheck and triage; do not blindly force upgrades. Frontend production audit also had zero findings; its full audit reported 4 moderate tooling findings.
 - #29/#30/#31: timing evidence is isolated local Linux without throttling, five-second
   API samples and five cold-context browser runs. Rerun on your target setup; not a
   claim that every machine meets the same latency.
@@ -40,5 +32,8 @@
 - Browser walkthrough selector matched a hidden second project label. Scoped the
   test to the visible project card; added finally cleanup lookup; smoke rerun passed.
 
-- Login throttling was moved ahead of JSON parsing so malformed JSON cannot bypass
-  the limit; the security API regression test verifies 429 for that bypass attempt.
+- Login throttling now follows JSON parsing to distinguish accounts. Malformed JSON is
+  throttled separately in the parser error path; the security regression test checks 429.
+
+- Original Windows evidence shows 20-user task listing p95 2319.49 ms and 2 of 5 dashboard runs over 2000 ms. This follow-up changes those paths; repeat the checks on Windows before claiming their targets are met.
+- Per-IP-and-email login limiting avoids blocking other accounts behind a shared proxy, but distributed source IPs or many distinct emails can evade a single bucket. Account-targeted lockout remains possible; a shared, layered limiter is needed for multi-instance production.

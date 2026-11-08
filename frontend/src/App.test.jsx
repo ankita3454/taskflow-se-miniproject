@@ -116,6 +116,12 @@ describe("UI-only workspace navigation", () => {
       screen.getByRole("navigation", { name: "Main navigation" }),
     ).toBeInTheDocument();
   });
+  it("does not load the task list until the Tasks screen is first opened", async () => {
+    await open("home");
+    expect(api.projectTasks).not.toHaveBeenCalled();
+    await navigate("tasks");
+    expect(api.projectTasks).toHaveBeenCalledWith(project.id, "test-token");
+  });
   it("opens direct links to Tasks and retains existing task controls", async () => {
     await open("tasks");
     expect(

@@ -24,9 +24,9 @@ FIRST Admin: register the intended account, then in backend PowerShell set
 It refuses when an active Admin exists. Never commit credentials or .env.
 
 Evidence: security API/service tests, limiter clock/capacity tests, Admin UI tests.
-The lockfile updates body-parser 2.3.0 to 2.4.0. Remaining transitive Prisma/audit
-findings must be reviewed (OPEN-RISKS.md in package 07). Do not claim a clean
-security audit or close #28 solely because functional tests pass.
+The lockfile updates body-parser and applies a targeted override for the Prisma config
+deepmerge-ts advisory. See OPEN-RISKS.md for audit scope, remaining development-tool
+findings and the compatibility risk of overriding a pinned major dependency.
 
 ## Security review map (not a penetration-test certification)
 

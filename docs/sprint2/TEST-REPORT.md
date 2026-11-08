@@ -35,3 +35,5 @@ planned for later sprints; it does not change original sprint deadlines.
 
 ## Final follow-up
 See FINAL-FOLLOWUP.md and the `*-followup-linux.json` evidence for the later fixes, tests and remaining target-environment checks. The earlier results above remain historical.
+
+The security follow-up regenerated the Prisma client after a clean install and passed 135 core plus 77 notification tests. Production-only audit reported zero findings; the full backend audit retained development-tool findings. See FINAL-FOLLOWUP.md.

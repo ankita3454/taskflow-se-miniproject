@@ -210,8 +210,8 @@ function idempotencyConflict() {
   );
 }
 
-async function findExistingIdempotentTask(userId, key, payloadHash) {
-  const existing = await prisma.taskCreationRequest.findUnique({
+async function findExistingIdempotentTask(userId, key, payloadHash, db) {
+  const existing = await db.taskCreationRequest.findUnique({
     where: {
       userId_key: { userId, key },
     },
@@ -239,8 +239,8 @@ async function findExistingIdempotentTask(userId, key, payloadHash) {
   return existing.task;
 }
 
-async function createTaskNormally(input, userId) {
-  return prisma.$transaction(async (tx) => {
+async function createTaskNormally(input, userId, db) {
+  return db.$transaction(async (tx) => {
     await validateCreationAccess(tx, input, userId);
     const task = await tx.task.create({
       data: {
@@ -261,19 +261,20 @@ async function createTaskNormally(input, userId) {
   });
 }
 
-async function createTaskIdempotently({ input, userId, key }) {
+async function createTaskIdempotently({ input, userId, key }, db) {
   const payloadHash = hashTaskInput(input);
 
   const existingTask = await findExistingIdempotentTask(
     userId,
     key,
     payloadHash,
+    db,
   );
 
   if (existingTask) return existingTask;
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    return await db.$transaction(async (tx) => {
       await validateCreationAccess(tx, input, userId);
       // The unique (userId, key) constraint arbitrates concurrent retries.
       const request = await tx.taskCreationRequest.create({
@@ -313,7 +314,7 @@ async function createTaskIdempotently({ input, userId, key }) {
     // Another request may have won the race. Its transaction must commit
     // before its task becomes visible, so retry the lookup briefly.
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      const task = await findExistingIdempotentTask(userId, key, payloadHash);
+      const task = await findExistingIdempotentTask(userId, key, payloadHash, db);
 
       if (task) return task;
 
@@ -333,7 +334,7 @@ export async function createTask({
   userId,
   projectAccess,
   idempotencyKey,
-}) {
+}, db = prisma) {
   const input = validateCreateInput(body);
   const key = validateIdempotencyKey(idempotencyKey);
 
@@ -363,7 +364,7 @@ export async function createTask({
       );
     }
 
-    const assignee = await prisma.user.findUnique({
+    const assignee = await db.user.findUnique({
       where: { id: input.assigneeId },
       select: { id: true, active: true },
     });
@@ -374,7 +375,7 @@ export async function createTask({
       });
     }
 
-    const membership = await prisma.projectMember.findUnique({
+    const membership = await db.projectMember.findUnique({
       where: {
         projectId_userId: {
           projectId: input.projectId,
@@ -394,10 +395,10 @@ export async function createTask({
   }
 
   if (!key) {
-    return createTaskNormally(input, userId);
+    return createTaskNormally(input, userId, db);
   }
 
-  return createTaskIdempotently({ input, userId, key });
+  return createTaskIdempotently({ input, userId, key }, db);
 }
 
 export async function listProjectTasks(projectId, db = prisma) {
@@ -409,8 +410,8 @@ export async function listProjectTasks(projectId, db = prisma) {
   });
 }
 
-export async function listAccessibleProjects(userId) {
-  return prisma.project.findMany({
+export async function listAccessibleProjects(userId, db = prisma) {
+  return db.project.findMany({
     where: {
       OR: [{ ownerId: userId }, { members: { some: { userId } } }],
     },
@@ -426,7 +427,7 @@ export async function listAccessibleProjects(userId) {
 
 const VALID_TASK_STATUSES = ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE"];
 
-export async function changeTaskStatus({ taskId, status, userId }) {
+export async function changeTaskStatus({ taskId, status, userId }, db = prisma) {
   if (typeof status !== "string" || !VALID_TASK_STATUSES.includes(status)) {
     throw new TaskError(
       400,
@@ -438,7 +439,7 @@ export async function changeTaskStatus({ taskId, status, userId }) {
     );
   }
 
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     const initial = await tx.task.findUnique({ where: { id: taskId } });
     if (!initial) throw new TaskError(404, "NOT_FOUND", "Task not found");
     await lockProject(tx, initial.projectId);
@@ -546,7 +547,7 @@ const EDITABLE_TASK_FIELDS = [
  * The route must authenticate the user and enforce Project Owner access.
  * A completed task cannot be edited.
  */
-export async function updateTask({ taskId, body, userId }) {
+export async function updateTask({ taskId, body, userId }, db = prisma) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     invalid("Request body must be a JSON object");
   }
@@ -643,7 +644,7 @@ export async function updateTask({ taskId, body, userId }) {
     }
   }
 
-  return prisma.$transaction(
+  return db.$transaction(
     async (tx) => {
       await lockTaskForUpdate(tx, taskId);
       const existing = await tx.task.findUnique({
@@ -794,8 +795,8 @@ async function lockTaskForUpdate(tx, taskId) {
   `;
 }
 
-export async function listProjectMembers(projectId) {
-  return prisma.projectMember.findMany({
+export async function listProjectMembers(projectId, db = prisma) {
+  return db.projectMember.findMany({
     where: { projectId, user: { active: true } },
     orderBy: { user: { name: "asc" } },
     select: {
@@ -805,7 +806,7 @@ export async function listProjectMembers(projectId) {
   });
 }
 
-export async function assignTask({ taskId, body, userId }) {
+export async function assignTask({ taskId, body, userId }, db = prisma) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     invalid("Request body must be a JSON object");
   }
@@ -824,7 +825,7 @@ export async function assignTask({ taskId, body, userId }) {
     });
   }
 
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     await lockTaskForUpdate(tx, taskId);
     const task = await tx.task.findUnique({
       where: { id: taskId },

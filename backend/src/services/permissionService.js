@@ -15,10 +15,10 @@ export function isUuid(value) {
  * F4-REQ-01, data dictionary). ProjectMember.projectRole never grants Owner
  * rights, and neither does a user's system role (MEMBER, OWNER, ADMIN).
  */
-export async function getProjectAccess(userId, projectId) {
+export async function getProjectAccess(userId, projectId, db = prisma) {
   if (!isUuid(projectId)) return null;
 
-  const project = await prisma.project.findUnique({
+  const project = await db.project.findUnique({
     where: { id: projectId },
     include: { members: { where: { userId }, select: { userId: true } } },
   });
@@ -38,13 +38,13 @@ export async function getProjectAccess(userId, projectId) {
  * assignee must still be a member of the project, so someone removed from it
  * loses that right even if the task is still assigned to them.
  */
-export async function getTaskAccess(userId, taskId) {
+export async function getTaskAccess(userId, taskId, db = prisma) {
   if (!isUuid(taskId)) return null;
 
-  const task = await prisma.task.findUnique({ where: { id: taskId } });
+  const task = await db.task.findUnique({ where: { id: taskId } });
   if (!task) return null;
 
-  const projectAccess = await getProjectAccess(userId, task.projectId);
+  const projectAccess = await getProjectAccess(userId, task.projectId, db);
   const isAssignee = task.assigneeId !== null && task.assigneeId === userId;
 
   return {

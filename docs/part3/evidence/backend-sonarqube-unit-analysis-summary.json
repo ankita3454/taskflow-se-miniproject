@@ -1,0 +1,32 @@
+{
+  "analysisDate": "2026-11-12",
+  "analysisId": "f0fcd650-95bd-4b24-83a8-ac7fa000ee2f",
+  "projectKey": "taskflow-backend-unit",
+  "server": "SonarQube Community Build 26.11.0.134175",
+  "scanner": "SonarScanner CLI 8.4.0.16527",
+  "qualityGate": "PASSED",
+  "scope": "Unit-only coverage for backend/src/services/*.js",
+  "tests": {
+    "nodePassed": 53,
+    "jestPassed": 45,
+    "failed": 0
+  },
+  "coverageTool": "c8 10.1.3 / V8",
+  "coverage": {
+    "linesCovered": 1582,
+    "linesTotal": 1592,
+    "lineCoveragePercent": 99.37,
+    "branchesCovered": 380,
+    "branchesTotal": 394,
+    "branchCoveragePercent": 96.44
+  },
+  "perModuleLineCoveragePercent": {
+    "authService.js": 100.0,
+    "invitationService.js": 100.0,
+    "notification-read.service.js": 100.0,
+    "notification.service.js": 98.96,
+    "permissionService.js": 100.0,
+    "projectService.js": 100.0,
+    "taskService.js": 99.11
+  }
+}

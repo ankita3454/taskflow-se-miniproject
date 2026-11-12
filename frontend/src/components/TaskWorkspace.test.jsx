@@ -463,3 +463,107 @@ describe("Task creation completion timing", () => {
     expect(api.createTask.mock.calls.map(call => call[2])).toEqual(["test-key-1", "test-key-2"]);
   });
 });
+
+describe("TaskWorkspace remaining workflow branches", () => {
+  it("shows empty projects and requires project selection before submission", async () => {
+    api.projects.mockResolvedValue({ projects: [] });
+    render(<TaskWorkspace token="t" onSessionExpired={vi.fn()} />);
+    expect(await screen.findByText(/You don't have any projects yet/)).toBeInTheDocument();
+    fireEvent.submit(document.querySelector(".task-create-card form"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Select a project before creating a task.",
+    );
+    expect(api.createTask).not.toHaveBeenCalled();
+  });
+
+  it("displays project loading errors and expires unauthorized sessions", async () => {
+    const expired = vi.fn();
+    api.projects.mockRejectedValueOnce(new Error("Projects unavailable"));
+    render(<TaskWorkspace token="t" onSessionExpired={expired} />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("Projects unavailable");
+    cleanup();
+
+    api.projects.mockRejectedValueOnce(
+      Object.assign(new Error("Expired"), { status: 401 }),
+    );
+    render(<TaskWorkspace token="t" onSessionExpired={expired} />);
+    await waitFor(() => expect(expired).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("selects an archived project only when no active project is available", async () => {
+    api.projects.mockResolvedValue({
+      projects: [{ ...project, archived: true }],
+    });
+    render(<TaskWorkspace token="t" onSessionExpired={vi.fn()} />);
+    expect(await screen.findByText("This project is archived; new tasks cannot be created.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create task" })).toBeDisabled();
+    expect(screen.getByText("Project One (Archived)")).toBeInTheDocument();
+  });
+
+  it("surfaces field validation errors from task creation and expires on 401", async () => {
+    const expired = vi.fn();
+    api.createTask.mockRejectedValueOnce(
+      Object.assign(new Error("Title is invalid"), {
+        status: 400,
+        fields: { title: "Title is too long" },
+      }),
+    );
+    render(<TaskWorkspace token="t" onSessionExpired={expired} />);
+    enterTitle("Bad title");
+    await submitTask();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Title is invalid");
+    expect(screen.getByText("Title is too long")).toBeInTheDocument();
+
+    api.createTask.mockRejectedValueOnce(
+      Object.assign(new Error("Expired"), { status: 401 }),
+    );
+    await submitTask();
+    await waitFor(() => expect(expired).toHaveBeenCalledOnce());
+  });
+
+  it("assigns a project member and handles generic assignment failures", async () => {
+    const ownerProject = { ...project, ownerId: "owner-1" };
+    const member = {
+      id: "member-1",
+      name: "Member One",
+      email: "member@example.test",
+    };
+    const anotherMember = {
+      id: "member-2",
+      name: "Member Two",
+      email: "member2@example.test",
+    };
+    const task = { ...createdTask("Assigned task", "assigned-1"), assigneeId: null };
+    api.projects.mockResolvedValue({ projects: [ownerProject] });
+    api.projectTasks.mockResolvedValue({ tasks: [task] });
+    api.projectMembers.mockResolvedValue({
+      members: [{ user: member }, { user: anotherMember }],
+    });
+    api.assignTask
+      .mockResolvedValueOnce({
+        task: { ...task, assigneeId: member.id, assignee: member },
+      })
+      .mockRejectedValueOnce(new Error("Assignment failed"));
+    render(
+      <TaskWorkspace
+        token="t"
+        userId="owner-1"
+        onSessionExpired={vi.fn()}
+      />,
+    );
+    const assignee = await screen.findByLabelText("Assignee for Assigned task");
+    fireEvent.change(assignee, { target: { value: member.id } });
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(
+      'Assigned "Assigned task" to Member One.',
+    ));
+    fireEvent.change(screen.getByLabelText("Assignee for Assigned task"), {
+      target: { value: "" },
+    });
+    expect(api.assignTask).toHaveBeenCalledOnce();
+    fireEvent.change(screen.getByLabelText("Assignee for Assigned task"), {
+      target: { value: anotherMember.id },
+    });
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Assignment failed"));
+  });
+});

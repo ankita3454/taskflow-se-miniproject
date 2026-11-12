@@ -73,3 +73,32 @@ it('ignores a stale poll response arriving after marking a notification read', a
 it('stops polling after unmount', async () => {
   const view = await mount(); view.unmount(); await act(async () => { await vi.advanceTimersByTimeAsync(10000); }); expect(api.listNotifications).toHaveBeenCalledTimes(1);
 });
+it('shows the empty panel state when there are no notifications', async () => {
+  await mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Notifications: 0 unread' }));
+  expect(screen.getByText("You're all caught up.")).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Mark all as read' })).toBeDisabled();
+});
+it('does not poll while a notification mutation is pending', async () => {
+  let resolveRead;
+  api.listNotifications.mockResolvedValue({ notifications: [item()] });
+  api.markNotificationRead.mockImplementation(() => new Promise(resolve => { resolveRead = resolve; }));
+  const view = await mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Notifications: 1 unread' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Mark as read' }));
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+  expect(api.listNotifications).toHaveBeenCalledTimes(1);
+  await act(async () => { resolveRead({ success: true }); });
+  view.unmount();
+});
+it('shows a recoverable failure when refreshing the mark-all-read state fails', async () => {
+  const callback = vi.fn();
+  api.listNotifications.mockResolvedValueOnce({ notifications: [item()] });
+  api.markAllNotificationsRead.mockRejectedValue(new Error('Offline'));
+  await mount(callback);
+  fireEvent.click(screen.getByRole('button', { name: 'Notifications: 1 unread' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Mark all as read' }));
+  await tick();
+  expect(screen.getByRole('alert')).toHaveTextContent('Could not refresh read status');
+  expect(callback).not.toHaveBeenCalled();
+});

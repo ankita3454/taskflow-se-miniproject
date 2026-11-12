@@ -1,23 +1,13 @@
-# Final verification follow-up
+# Final Validation Notes — Recorded Windows Evidence
 
-The first live Mailtrap sandbox run produced one successful delivery and one UNKNOWN
-claim with SMTP 550. A sanitized diagnostic identified the sandbox rate limit. The
-follow-up adds process-local pacing without automatically retrying uncertain sends.
-Existing claims must not be reset blindly. A fresh live sandbox retest is required.
+## Performance
 
-The Windows 1,000-task / 20-user run after PR #58 reported list p95 843.612 ms,
-search p95 210.264 ms, and combined filter p95 621.173 ms, with zero errors,
-timeouts and non-2xx responses. The Windows 500-task browser runs were 979.42,
-934.67, 637.43, 721.97 and 782.83 ms, with no recorded errors. These are
-user-reported results; attach the matching raw JSON artifacts before closing the
-performance issues. The earlier Windows failures remain in repository history.
+On 2026-11-08, `evidence/load-final-windows-4407bd09d4.json` records a 1,000-task dataset and 20 concurrent authenticated users: p95 843.61 ms for list, 210.26 ms for search and 621.17 ms for the combined filter, with zero recorded errors, timeouts and non-2xx responses. `evidence/load-extra-windows-ec02c57c45.json` records additional search/filter variants; the highest 20-user p95 was 925.47 ms, with zero recorded errors. Each operation was sampled for five seconds on the stated local setup.
 
-Set `LOAD_EXTRA_FILTERS=yes` for an expanded load run covering individual status,
-priority, assignee, tag, from/to dates and date-range filters, plus a second search.
-Its measured results still need to be recorded. The fixture creates a test tag and
-100 test tag assignments in the disposable database and cleans them up afterward.
-Use a dedicated disposable database; never run this against the application database.
+`evidence/browser-final-windows-7c78f9b314.json` records five 500-task dashboard renders: 979.42, 934.67, 637.43, 721.97 and 782.83 ms. Each was below two seconds, with no recorded browser errors. These artifacts are present in the supplied docs; older notes requesting their attachment were superseded. Earlier Windows dashboard timing had two runs over two seconds and remains recorded in `browser-windows-local.json`.
 
-The quality/portability and manual security checks and evidence remain to be completed.
-See OPEN-RISKS.md and QUALITY-REVIEW.md; passing one benchmark is not proof of all SRS
-requirements. Never commit .env, local Compose overrides or secrets.
+## Sandbox reminders
+
+`evidence/mailtrap-windows-3b0650c609.json` records two sends on the first run, two skips on the second, two reminder records, two in-app records and no reminder for the Done task. Its inbox-verification flag is false and it does not specify which intervals were exercised. The original system report mentions subsequent user confirmation without a screenshot. The original follow-up also reports an earlier SMTP 550/UNKNOWN outcome; uncertainty and recovery limitations are documented in `OPEN-RISKS.md`.
+
+These results establish only the recorded local checks. They do not establish complete system acceptance, multi-runtime portability, exhaustive security review or a production latency guarantee.

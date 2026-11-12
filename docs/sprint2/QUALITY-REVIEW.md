@@ -1,29 +1,17 @@
-# #32 quality review and evidence
+# Sprint 2 Quality Review
 
-- Maintainability: existing Auth/Project/Task/Notification services retained; new
-  task/security/collaboration/dashboard/reminder service factories accept injectable
-  repositories/transport. Routes contain HTTP adaptation, not business policy.
-- Testability: sprint2-service-units.test.js and notification service tests exercise repository mocks without HTTP/PostgreSQL. Auth, Project and Task entrypoints accept injected database clients; final-service-isolation.test.js checks isolated reads, transaction entry and same-key retry. Existing database/API tests remain in place.
-- Reliability: original 17 TaskWorkspace tests and creation-idempotency API tests
-  remain; no assertions removed. Repeated/parallel reminder calls produce one claim
-  and one send attempt per interval. Uncertain SMTP failures deliberately do not retry.
-- Usability: final browser smoke script (package 08) records project creation and
-  first task through Projects then Tasks (two primary authenticated work screens;
-  three including registration). Uses a disposable authenticated test account.
-- Performance: actual 1,000-task and 20-user results are in package 06, 500-task
-  production browser results follow in 08. These are local baselines, not load SLAs.
-- Portability: existing Dockerfile/build settings retained, no host address/credentials
-  baked into images. Original user setup runs on Windows Docker Desktop, but NEW Sprint
-  2 has NOT been built/run there or on a second Docker-compatible runtime here.
-  A clean second-runtime check is a required remaining acceptance item.
+## Maintainability and testability
 
-## Required portability evidence, coordinator and Nuthan
+The backend separates route handling from service logic and uses injectable persistence or transport in several services. Source includes isolated service tests alongside database/API tests. The saved SonarQube summary reports a passed gate for seven backend service modules; it is not a system-wide static-analysis certification.
 
-Use a clean clone plus merged packages on a second Docker-compatible environment.
-Configure local .env from examples, choose an allowed host database port if needed,
-run `docker compose up -d --build`, record `docker compose ps`, backend health,
-registration/login, project/task, comments, dashboard, and notification workflows.
-Record runtime/OS/version/commit and failures/retest. Never publish .env, credentials,
-JWTs, Mailtrap secrets or DB backups. Do not use down -v against a database you need.
+## Reliability and security
 
-#32 is partially verified, not automatically closed. See OPEN-RISKS.md.
+Task/interval claims limit duplicate automatic reminder submissions, but delivery is not atomic with the database and uncertain sends need investigation. Authentication, server-side authorization, input checks, audit records and rate limiting are present in the supplied backend. The limiter is process-local and the original reports record remaining development-tool dependency findings. Full penetration testing and complete SEC-01–07 sign-off are not established.
+
+## Usability and performance
+
+The saved authenticated browser smoke completed project and first-task actions in two primary work screens, without testing registration/login. A separate three-screen walkthrough is reported without independent evidence. The recorded Windows dashboard and load tests met their respective thresholds in short local runs; the earlier Windows dashboard had two failures. Details and limitations are in the dedicated browser/load reports.
+
+## Portability and data integrity
+
+The original reports describe a Windows Docker environment and isolated Linux Node/PostgreSQL testing. They do not document a second clean Docker-compatible runtime. Database constraints and tests address membership and task consistency, while parent-task deletion intentionally removes task-level comments/activity and conflicts with the broad immutable wording in F5-REQ-07. Quality conclusions are scoped to the supplied evidence, not a blanket project acceptance.

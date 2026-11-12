@@ -1,95 +1,27 @@
-# TaskFlow permission rules
+# TaskFlow Permission Rules
 
-Source: SRS Section 6.5 (Business Rules), F1-REQ-07/08/09, F4-REQ-07,
-F8-REQ-02/05 and SEC-02. Implemented for issue #3.
+## Purpose
 
-## Two kinds of role
+TaskFlow separates a user's system role from their access to an individual project. The following summarizes the supplied backend middleware, route definitions and Sprint 2 decisions; it is not a new security-test result.
 
-**System role** (`User.role`): every user has exactly one of `MEMBER`
-(the default), `OWNER` or `ADMIN`. Only an Administrator can change it.
+## System and project roles
 
-**Project Owner**: each project has exactly one Owner, the user in
-`Project.ownerId` (the creator, F4-REQ-01). Everyone else in
-`ProjectMember` is a member. `ProjectMember.projectRole` never grants Owner
-rights, even if it says `"Owner"`.
+The system roles are Member, Owner and Admin. Admin controls system-wide user administration; a system role alone does not grant access to an unrelated project. Each project has one canonical owner identified by `Project.ownerId`. Project membership grants access to project data; a stored membership role by itself is not a substitute for the canonical owner check. An authorized ownership transfer updates the canonical owner and membership roles without changing system roles.
 
-A system role never grants rights inside a project. A user whose system
-role is `OWNER` or `ADMIN` has no access to a project they aren't part of.
+| Action | Documented authority |
+|---|---|
+| Access a protected endpoint | Active authenticated user |
+| View a project and create tasks | Project member, subject to project state |
+| Invite members, remove members, transfer ownership, archive | Canonical project Owner |
+| View a task | Member of the task's project |
+| Assign or reassign a task | Project Owner |
+| Edit task details | Project Owner before Done |
+| Change task status | Current project-member assignee or project Owner, subject to transition and dependency rules |
+| Administer accounts and view security audit | System Admin |
+| Accept or decline an invitation | Intended invitee |
 
-## Who can do what
+A removed member loses project access; existing task attribution is retained. Authentication re-reads account state, and the documented session-version mechanism invalidates prior sessions after deactivation. Permission failures use controlled responses; exact error precedence depends on the route and whether the resource is identifiable. An archived project's existing data remains viewable, but new task creation is blocked.
 
-| Action | Allowed | Check to use | Otherwise |
-|---|---|---|---|
-| Any protected endpoint | A logged-in, active user | `requireAuth` | 401 |
-| View a project, create tasks in it | Members of that project (incl. its Owner) | `requireProjectMember()` | 403 |
-| Invite, remove or change a member's project role | That project's Owner | `requireProjectOwner()` | 403 |
-| Accept or decline a project invitation | The user whose e-mail matches the invitation | Invitation service ownership check | 403 |
-| Archive a project | That project's Owner | `requireProjectOwner()` | 403 |
-| View a task | Members of the task's project | `requireTaskMember()` | 403 |
-| Assign or reassign a task | The Owner of the task's project | `requireTaskProjectOwner()` | 403 |
-| Change a task's status | The task's assignee (while still a project member), or the Owner of its project | `requireTaskStatusChange()` | 403 |
-| Deactivate/reactivate a user, change a system role, user management, audit log | Administrators | `requireRole("ADMIN")` | 403 |
-| Edit task title, description, priority, due date or time estimate | Only the Owner of the task's project, before the task reaches Done | `requireTaskProjectOwner()` plus the task update service's completion check | 403 for non-Owners; 409 for completed tasks |
+## Implementation and evidence
 
-Task detail editing and status changes are separate permissions. The task's
-creator and assignee do not gain permission to edit task details merely from
-those relationships. Only the Project Owner may edit task details, and only
-before the task reaches Done. Status transitions follow the separate
-`requireTaskStatusChange()` rule.
-
-An unknown or malformed project/task ID returns 404. A rejected request
-never reaches the route handler, so nothing is changed.
-
-## How it's enforced
-
-- `requireAuth` (`backend/src/middleware/auth.js`) checks the JWT, then
-  reads the user from the database **on every request**. A role change
-  applies to the user's very next request (F1-REQ-07), and a deactivated
-  user's existing tokens stop working immediately (F8-REQ-02).
-- `requireRole(...)` (same file) checks the system role.
-- The project and task checks are in `backend/src/middleware/permissions.js`
-  and use `backend/src/services/permissionService.js`. Each check reads the
-  project or task ID from the route parameter (`:projectId`, `:taskId`) or,
-  if absent, from the JSON body. Pass `{ param: "id" }` to use another name.
-- On success they attach `req.project`, `req.projectAccess`
-  (`{ isOwner, isMember }`) and, for task checks, `req.task`, so handlers
-  don't need to load them again.
-
-## Using the checks in a route
-
-```js
-import { requireAuth, requireRole } from "../middleware/auth.js";
-import {
-  requireProjectMember,
-  requireProjectOwner,
-  requireTaskProjectOwner,
-  requireTaskStatusChange,
-} from "../middleware/permissions.js";
-
-router.get("/projects/:projectId", requireAuth, requireProjectMember(), getProject);
-router.post("/projects/:projectId/archive", requireAuth, requireProjectOwner(), archiveProject);
-router.post("/tasks", requireAuth, requireProjectMember(), createTask); // projectId in body
-router.post("/tasks/:taskId/assign", requireAuth, requireTaskProjectOwner(), assignTask);
-router.patch("/tasks/:taskId/status", requireAuth, requireTaskStatusChange(), changeStatus);
-router.post("/admin/users/:id/deactivate", requireAuth, requireRole("ADMIN"), deactivateUser);
-```
-
-## Tests
-
-`backend/tests/permissions.test.js` covers TC-05, TC-16, cross-project
-access, the single-Owner rule, task-status and assignment permissions
-(including assignees removed from the project), Admin-only actions, and
-immediate role changes and deactivation. Run with `npm test`; CI runs it on
-every push.
-
-`backend/tests/invitations.test.js` covers Owner-only invitation creation,
-invitee inbox visibility, invitation response ownership, acceptance with
-Member membership, and declining without membership.
-
-## Not covered here
-
-- Applying these checks to the real project, task and admin endpoints.
-  That happens in F2, F4, F5 and F8 as those endpoints are built.
-- Business rules that aren't about who may act: no new tasks in an archived
-  project (F4-REQ-06), and no Done while a blocking dependency is open.
-  Those belong in the project and task services.
+`backend/src/middleware/auth.js`, `backend/src/middleware/permissions.js`, `backend/src/services/permissionService.js`, task/invitation routes, and `backend/src/sprint2/collaboration.js` provide the relevant checks. Backend test files such as `permissions.test.js`, `invitations.test.js`, and `sprint2-collaboration.test.js` describe negative and role-specific cases. Their existence is not proof that all endpoints and roles were exhaustively validated. See `part3/00-UPDATED-TEST-CASES.md` for the evidence boundary.

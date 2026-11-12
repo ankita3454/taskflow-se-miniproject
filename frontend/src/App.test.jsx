@@ -42,6 +42,26 @@ vi.mock("./lib/api.js", () => ({
     ].map((key) => [key, vi.fn()]),
   ),
 }));
+vi.mock("./lib/sprint2-api.js", () => ({
+  featureRequest: vi.fn(async (path) => {
+    if (path === "/admin/users") return { users: [] };
+    if (path.startsWith("/admin/audit")) return { entries: [] };
+    return {
+      tasks: [],
+      comments: [],
+      activities: [],
+      tags: [],
+      project: { id: "project-1", ownerId: "user-1" },
+      completion: 0,
+      overdue: 0,
+      total: 0,
+      done: 0,
+      workload: [],
+      burndown: null,
+    };
+  }),
+  queryString: vi.fn(() => ""),
+}));
 const user = {
   id: "user-1",
   name: "Avery Green",
@@ -376,6 +396,36 @@ describe("UI-only workspace navigation", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: "Overview" }),
     ).toBeInTheDocument();
+  });
+  it("shows Today, dashboard, settings, and explorer pages from navigation", async () => {
+    await open("today");
+    expect(await screen.findByRole("heading", { name: "Your Today view" })).toBeVisible();
+    await navigate("dashboard");
+    expect(await screen.findByRole("heading", { name: "Project dashboard" })).toBeVisible();
+    await navigate("management");
+    expect(await screen.findByRole("heading", { name: "Project membership and archiving" })).toBeVisible();
+    await navigate("explorer");
+    expect(await screen.findByRole("heading", { name: "Find and organise tasks" })).toBeVisible();
+  });
+  it("shows the administrator screen only to system administrators", async () => {
+    api.me.mockResolvedValue({ user: { ...user, role: "ADMIN" } });
+    await open("admin");
+    expect(await screen.findByRole("heading", { name: "Security audit" })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Administration/ })).toBeInTheDocument();
+
+    cleanup();
+    api.me.mockResolvedValue({ user });
+    await open("admin");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Administrator access is required.",
+    );
+    expect(screen.queryByRole("link", { name: /Administration/ })).not.toBeInTheDocument();
+  });
+  it("moves focus to the workspace when the skip link is activated", async () => {
+    await open();
+    const main = document.getElementById("workspace-main");
+    fireEvent.click(screen.getByRole("link", { name: "Skip to content" }));
+    expect(main).toHaveFocus();
   });
 });
 

@@ -1,0 +1,814 @@
+{
+  "total": {
+    "lines": {
+      "total": 3663,
+      "covered": 3356,
+      "skipped": 0,
+      "pct": 91.61
+    },
+    "statements": {
+      "total": 3663,
+      "covered": 3356,
+      "skipped": 0,
+      "pct": 91.61
+    },
+    "functions": {
+      "total": 141,
+      "covered": 135,
+      "skipped": 0,
+      "pct": 95.74
+    },
+    "branches": {
+      "total": 902,
+      "covered": 774,
+      "skipped": 0,
+      "pct": 85.8
+    },
+    "branchesTrue": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "backend/src/app.js": {
+    "lines": {
+      "total": 74,
+      "covered": 70,
+      "skipped": 0,
+      "pct": 94.59
+    },
+    "functions": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 74,
+      "covered": 70,
+      "skipped": 0,
+      "pct": 94.59
+    },
+    "branches": {
+      "total": 12,
+      "covered": 4,
+      "skipped": 0,
+      "pct": 33.33
+    }
+  },
+  "backend/src/server.js": {
+    "lines": {
+      "total": 13,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 0
+    },
+    "functions": {
+      "total": 1,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 0
+    },
+    "statements": {
+      "total": 13,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 0
+    },
+    "branches": {
+      "total": 1,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 0
+    }
+  },
+  "backend/src/middleware/auth.js": {
+    "lines": {
+      "total": 73,
+      "covered": 69,
+      "skipped": 0,
+      "pct": 94.52
+    },
+    "functions": {
+      "total": 3,
+      "covered": 3,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 73,
+      "covered": 69,
+      "skipped": 0,
+      "pct": 94.52
+    },
+    "branches": {
+      "total": 20,
+      "covered": 17,
+      "skipped": 0,
+      "pct": 85
+    }
+  },
+  "backend/src/middleware/permissions.js": {
+    "lines": {
+      "total": 96,
+      "covered": 88,
+      "skipped": 0,
+      "pct": 91.66
+    },
+    "functions": {
+      "total": 9,
+      "covered": 9,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 96,
+      "covered": 88,
+      "skipped": 0,
+      "pct": 91.66
+    },
+    "branches": {
+      "total": 30,
+      "covered": 26,
+      "skipped": 0,
+      "pct": 86.66
+    }
+  },
+  "backend/src/repositories/notification.repository.js": {
+    "lines": {
+      "total": 106,
+      "covered": 106,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 7,
+      "covered": 7,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 106,
+      "covered": 106,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 8,
+      "covered": 8,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "backend/src/repositories/prisma.js": {
+    "lines": {
+      "total": 5,
+      "covered": 5,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 5,
+      "covered": 5,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 1,
+      "covered": 1,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "backend/src/routes/auth.routes.js": {
+    "lines": {
+      "total": 102,
+      "covered": 94,
+      "skipped": 0,
+      "pct": 92.15
+    },
+    "functions": {
+      "total": 1,
+      "covered": 1,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 102,
+      "covered": 94,
+      "skipped": 0,
+      "pct": 92.15
+    },
+    "branches": {
+      "total": 18,
+      "covered": 17,
+      "skipped": 0,
+      "pct": 94.44
+    }
+  },
+  "backend/src/routes/invitations.routes.js": {
+    "lines": {
+      "total": 72,
+      "covered": 67,
+      "skipped": 0,
+      "pct": 93.05
+    },
+    "functions": {
+      "total": 1,
+      "covered": 1,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 72,
+      "covered": 67,
+      "skipped": 0,
+      "pct": 93.05
+    },
+    "branches": {
+      "total": 14,
+      "covered": 13,
+      "skipped": 0,
+      "pct": 92.85
+    }
+  },
+  "backend/src/routes/notification.routes.js": {
+    "lines": {
+      "total": 69,
+      "covered": 60,
+      "skipped": 0,
+      "pct": 86.95
+    },
+    "functions": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 69,
+      "covered": 60,
+      "skipped": 0,
+      "pct": 86.95
+    },
+    "branches": {
+      "total": 12,
+      "covered": 8,
+      "skipped": 0,
+      "pct": 66.66
+    }
+  },
+  "backend/src/routes/projects.routes.js": {
+    "lines": {
+      "total": 51,
+      "covered": 46,
+      "skipped": 0,
+      "pct": 90.19
+    },
+    "functions": {
+      "total": 1,
+      "covered": 1,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 51,
+      "covered": 46,
+      "skipped": 0,
+      "pct": 90.19
+    },
+    "branches": {
+      "total": 11,
+      "covered": 10,
+      "skipped": 0,
+      "pct": 90.9
+    }
+  },
+  "backend/src/routes/task.routes.js": {
+    "lines": {
+      "total": 134,
+      "covered": 134,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 1,
+      "covered": 1,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 134,
+      "covered": 134,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 20,
+      "covered": 20,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "backend/src/services/authService.js": {
+    "lines": {
+      "total": 189,
+      "covered": 189,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 10,
+      "covered": 10,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 189,
+      "covered": 189,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 56,
+      "covered": 56,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "backend/src/services/invitationService.js": {
+    "lines": {
+      "total": 129,
+      "covered": 109,
+      "skipped": 0,
+      "pct": 84.49
+    },
+    "functions": {
+      "total": 5,
+      "covered": 4,
+      "skipped": 0,
+      "pct": 80
+    },
+    "statements": {
+      "total": 129,
+      "covered": 109,
+      "skipped": 0,
+      "pct": 84.49
+    },
+    "branches": {
+      "total": 23,
+      "covered": 16,
+      "skipped": 0,
+      "pct": 69.56
+    }
+  },
+  "backend/src/services/notification-read.service.js": {
+    "lines": {
+      "total": 60,
+      "covered": 60,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 6,
+      "covered": 6,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 60,
+      "covered": 60,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 13,
+      "covered": 13,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "backend/src/services/notification.service.js": {
+    "lines": {
+      "total": 193,
+      "covered": 191,
+      "skipped": 0,
+      "pct": 98.96
+    },
+    "functions": {
+      "total": 4,
+      "covered": 4,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 193,
+      "covered": 191,
+      "skipped": 0,
+      "pct": 98.96
+    },
+    "branches": {
+      "total": 59,
+      "covered": 57,
+      "skipped": 0,
+      "pct": 96.61
+    }
+  },
+  "backend/src/services/permissionService.js": {
+    "lines": {
+      "total": 56,
+      "covered": 56,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 3,
+      "covered": 3,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 56,
+      "covered": 56,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 16,
+      "covered": 15,
+      "skipped": 0,
+      "pct": 93.75
+    }
+  },
+  "backend/src/services/projectService.js": {
+    "lines": {
+      "total": 65,
+      "covered": 65,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 4,
+      "covered": 4,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 65,
+      "covered": 65,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 12,
+      "covered": 12,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "backend/src/services/taskService.js": {
+    "lines": {
+      "total": 900,
+      "covered": 746,
+      "skipped": 0,
+      "pct": 82.88
+    },
+    "functions": {
+      "total": 24,
+      "covered": 23,
+      "skipped": 0,
+      "pct": 95.83
+    },
+    "statements": {
+      "total": 900,
+      "covered": 746,
+      "skipped": 0,
+      "pct": 82.88
+    },
+    "branches": {
+      "total": 203,
+      "covered": 162,
+      "skipped": 0,
+      "pct": 79.8
+    }
+  },
+  "backend/src/sprint2/collaboration.js": {
+    "lines": {
+      "total": 173,
+      "covered": 169,
+      "skipped": 0,
+      "pct": 97.68
+    },
+    "functions": {
+      "total": 7,
+      "covered": 7,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 173,
+      "covered": 169,
+      "skipped": 0,
+      "pct": 97.68
+    },
+    "branches": {
+      "total": 34,
+      "covered": 28,
+      "skipped": 0,
+      "pct": 82.35
+    }
+  },
+  "backend/src/sprint2/collaboration.routes.js": {
+    "lines": {
+      "total": 50,
+      "covered": 50,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 50,
+      "covered": 50,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 10,
+      "covered": 10,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "backend/src/sprint2/common.js": {
+    "lines": {
+      "total": 82,
+      "covered": 74,
+      "skipped": 0,
+      "pct": 90.24
+    },
+    "functions": {
+      "total": 9,
+      "covered": 9,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 82,
+      "covered": 74,
+      "skipped": 0,
+      "pct": 90.24
+    },
+    "branches": {
+      "total": 31,
+      "covered": 26,
+      "skipped": 0,
+      "pct": 83.87
+    }
+  },
+  "backend/src/sprint2/dashboard.js": {
+    "lines": {
+      "total": 162,
+      "covered": 158,
+      "skipped": 0,
+      "pct": 97.53
+    },
+    "functions": {
+      "total": 10,
+      "covered": 10,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 162,
+      "covered": 158,
+      "skipped": 0,
+      "pct": 97.53
+    },
+    "branches": {
+      "total": 53,
+      "covered": 48,
+      "skipped": 0,
+      "pct": 90.56
+    }
+  },
+  "backend/src/sprint2/dashboard.routes.js": {
+    "lines": {
+      "total": 37,
+      "covered": 37,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 37,
+      "covered": 37,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 6,
+      "covered": 6,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "backend/src/sprint2/reminders.js": {
+    "lines": {
+      "total": 217,
+      "covered": 170,
+      "skipped": 0,
+      "pct": 78.34
+    },
+    "functions": {
+      "total": 10,
+      "covered": 7,
+      "skipped": 0,
+      "pct": 70
+    },
+    "statements": {
+      "total": 217,
+      "covered": 170,
+      "skipped": 0,
+      "pct": 78.34
+    },
+    "branches": {
+      "total": 45,
+      "covered": 31,
+      "skipped": 0,
+      "pct": 68.88
+    }
+  },
+  "backend/src/sprint2/security.js": {
+    "lines": {
+      "total": 152,
+      "covered": 151,
+      "skipped": 0,
+      "pct": 99.34
+    },
+    "functions": {
+      "total": 7,
+      "covered": 7,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 152,
+      "covered": 151,
+      "skipped": 0,
+      "pct": 99.34
+    },
+    "branches": {
+      "total": 62,
+      "covered": 52,
+      "skipped": 0,
+      "pct": 83.87
+    }
+  },
+  "backend/src/sprint2/security.routes.js": {
+    "lines": {
+      "total": 26,
+      "covered": 26,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 26,
+      "covered": 26,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 6,
+      "covered": 6,
+      "skipped": 0,
+      "pct": 100
+    }
+  },
+  "backend/src/sprint2/tasks.js": {
+    "lines": {
+      "total": 191,
+      "covered": 183,
+      "skipped": 0,
+      "pct": 95.81
+    },
+    "functions": {
+      "total": 8,
+      "covered": 8,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 191,
+      "covered": 183,
+      "skipped": 0,
+      "pct": 95.81
+    },
+    "branches": {
+      "total": 70,
+      "covered": 59,
+      "skipped": 0,
+      "pct": 84.28
+    }
+  },
+  "backend/src/sprint2/tasks.routes.js": {
+    "lines": {
+      "total": 67,
+      "covered": 67,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 0,
+      "covered": 0,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 67,
+      "covered": 67,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 13,
+      "covered": 12,
+      "skipped": 0,
+      "pct": 92.3
+    }
+  },
+  "backend/src/utils/jwt.js": {
+    "lines": {
+      "total": 31,
+      "covered": 28,
+      "skipped": 0,
+      "pct": 90.32
+    },
+    "functions": {
+      "total": 2,
+      "covered": 2,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 31,
+      "covered": 28,
+      "skipped": 0,
+      "pct": 90.32
+    },
+    "branches": {
+      "total": 5,
+      "covered": 3,
+      "skipped": 0,
+      "pct": 60
+    }
+  },
+  "backend/src/utils/validation.js": {
+    "lines": {
+      "total": 88,
+      "covered": 88,
+      "skipped": 0,
+      "pct": 100
+    },
+    "functions": {
+      "total": 8,
+      "covered": 8,
+      "skipped": 0,
+      "pct": 100
+    },
+    "statements": {
+      "total": 88,
+      "covered": 88,
+      "skipped": 0,
+      "pct": 100
+    },
+    "branches": {
+      "total": 38,
+      "covered": 38,
+      "skipped": 0,
+      "pct": 100
+    }
+  }
+}

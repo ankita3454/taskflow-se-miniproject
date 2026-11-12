@@ -1,43 +1,17 @@
-# Remaining checks, limitations and dependency risks
+# Open Risks and Evidence Limitations
 
-## Do not silently close these acceptance gaps
-- #22: live Mailtrap sandbox delivery has not been executed; transport is tested with
-  injected mail, not fabricated Mailtrap screenshots. Credentials must remain local.
-- #32: new Sprint 2 Docker runtime/second-runtime portability check remains pending. Auth, Project and Task service entrypoints accept an injectable database; notification services use injectable repositories.
-- #28: The Prisma config deepmerge-ts advisory is mitigated by a scoped npm override to 8.0.2. This is a major-version override of Prisma 6's exact dependency pin; validate Prisma generation/migration and application behavior on dependency upgrades. Production-only audit had zero findings, while the full backend audit reported 3 low and 19 moderate development-tool findings. Recheck and triage; do not blindly force upgrades. Frontend production audit also had zero findings; its full audit reported 4 moderate tooling findings.
-- #29/#30/#31: timing evidence is isolated local Linux without throttling, five-second
-  API samples and five cold-context browser runs. Rerun on your target setup; not a
-  claim that every machine meets the same latency.
+| Area | Current documented position | Risk or limitation |
+|---|---|---|
+| Reminder delivery | Saved live sender summary records 2 sends and 2 skips; inbox flag false. Original report mentions later user confirmation without screenshot. | Intervals are not identified in the JSON; SMTP and database cannot ensure exactly-once delivery. CLAIMED/UNKNOWN outcomes need investigation. |
+| Reminder schedule | Exact due-minus-3 and due-minus-1 UTC dates | Downtime covering an entire window may cause a missed reminder. Process-local pacing does not coordinate multiple workers. |
+| Windows performance | Later saved load and dashboard runs met their local thresholds | Short samples and a specific machine do not prove production performance. Earlier Windows dashboard evidence includes two failures; the original report also describes an earlier slow task-list run. |
+| Portability | Windows Docker operation and Linux local runs are described | A separate clean Docker-compatible runtime and full workflow evidence are not supplied. |
+| Login security | In-memory per-IP/email limiter; malformed JSON handled separately | Not distributed or global per-account protection; proxy and multi-instance deployment require appropriate design. |
+| Dependencies | Original report says production audit had zero findings but development-tool findings remained; Prisma override applied | Raw audit logs absent; override crosses a pinned major version and has compatibility risk. Zero findings at one point is not zero security risk. |
+| Coverage | 99.37% unit-only line coverage for seven `src/services` modules | Does not extend to separate `src/sprint2` modules; coverage is not functional acceptance. |
+| Audit/history | Security audit separate from task activity; audit listing capped at 1,000 | Parent task deletion removes task-level comments/activity, conflicting with absolute immutability wording; security audit does not retain full task history. |
+| Burndown | Reconstructs recorded status history from TODO | Imported tasks lacking activity and deleted tasks may make historical charts incomplete. |
+| Traceability and acceptance | Representative tests and partial evidence exist | Full 29-case execution, all SEC checks, zero open Sev-1 defects and complete SRS requirement mapping are not demonstrated. TC-28's description boundary conflicts with the SRS. |
+| Frontend verification | Saved coverage summary and browser JSON included | Frontend source, full runner logs, screenshots for the stated inbox confirmation and independent pilot sign-off were not supplied. |
 
-## Operational limitations (explicit, not hidden)
-- Login limiter is in-memory per process; multi-replica needs a shared limiter store.
-- SMTP cannot atomically commit with PostgreSQL. CLAIMED/UNKNOWN records need operator
-  investigation, never blind replay; at-most-one submission can trade delivery for
-  duplicate prevention. SMTP send holds a project lock for up to the transport timeout.
-- The scheduler checks exact UTC dates; downtime through an entire window does not
-  invent a late catch-up reminder. Product owner should approve any later catch-up policy.
-- Audit listing is capped at 1,000 entries, newest first; no pagination/retention purge
-  was added to scope. Operators needing full export must design that separately.
-- Burndown reconstructs recorded history from TODO; direct DB imports lacking status
-  logs cannot produce accurate historical actuals. Deletion removes that task from scope.
-- Task browser dependency chooser contains visible filtered tasks. Clear filters to
-  choose other blockers. No cross-project dependencies or drag/drop were invented.
-
-## Retested defects found during preparation
-- Dashboard integration syntax and missing screen mounts corrected; lint/build/UI
-  tests pass. No standalone build-success claim substituted for feature tests.
-- Existing activity rollback test used an unauthorised actor as a failing-write
-  mechanism. Replaced with a real activity constraint failure, preserving rollback
-  assertions and keeping the strengthened authorisation check.
-- Browser walkthrough selector matched a hidden second project label. Scoped the
-  test to the visible project card; added finally cleanup lookup; smoke rerun passed.
-
-- Login throttling now follows JSON parsing to distinguish accounts. Malformed JSON is
-  throttled separately in the parser error path; the security regression test checks 429.
-
-- Original Windows evidence shows 20-user task listing p95 2319.49 ms and 2 of 5 dashboard runs over 2000 ms. This follow-up changes those paths; repeat the checks on Windows before claiming their targets are met.
-- Per-IP-and-email login limiting avoids blocking other accounts behind a shared proxy, but distributed source IPs or many distinct emails can evade a single bucket. Account-targeted lockout remains possible; a shared, layered limiter is needed for multi-instance production.
-- The Mailtrap free sandbox permits one email per 10 seconds. Sandbox sends are now
-  paced per process before opening the sending transaction; different processes and
-  external clients sharing a sandbox are not coordinated. Test live and run a single
-  reminder worker, or implement a shared limiter for multi-worker use.
+These items are documented limitations rather than claims that a new test failed. No additional tests were run in preparing this rewrite.

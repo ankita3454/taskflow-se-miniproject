@@ -1,28 +1,19 @@
-# NFR-01 and NFR-05 verification (#29, #31)
+# Task API Load Verification
 
-Run only against a disposable PostgreSQL database with the foundation migration.
-From backend after npm ci, with DATABASE_URL and JWT_SECRET configured for that DB:
+## Method
 
-```powershell
-$env:ALLOW_PERFORMANCE_FIXTURES='yes'
-$env:LOAD_DURATION_SECONDS='5'
-node scripts/sprint2/load.js
-Remove-Item Env:ALLOW_PERFORMANCE_FIXTURES
-```
+Saved artifacts describe Autocannon against an Express listener and real PostgreSQL on the same host, using a single 1,000-task project, 20 distinct authenticated users, closed-loop traffic and five seconds per operation. The p95 is computed from response-event latency samples. There was no excluded warmup. These are short local measurements, not endurance or production-SLA evidence.
 
-Autocannon (submitted test-plan tool) seeds 1,000 tasks and 20 distinct authenticated
-members in one project. Tests list, keyword search, combined status/priority/due-sort
-filter separately, at 1 and 20 concurrent connections (one token per connection).
-Closed-loop, no pipelining, no think time, five measured seconds/operation; no warmup
-excluded. Nearest-rank p95 uses all response-event latency samples. Result JSON also
-records request count, errors/timeouts/non-2xx, p99 and environment. Any error or
-p95 >1,000ms fails the process. Fixtures are removed in finally, only own generated
-records. An abrupt process kill may require manual cleanup of Disposable performance
-fixtures; never clear unrelated data. Output performance-results/ is gitignored.
-LOAD_DURATION_SECONDS can increase duration for a longer local run.
+## Windows results
 
-Committed `evidence/load.json` is the actual isolated Linux run, not Windows/Docker
-or production evidence. All six operations met the target, no API errors. Same-process
-HTTP load generator/API may share CPU: results describe only this documented setup,
-not a universal SLA or endurance test. Ashritha owns #29; Nuthan reviews/reruns the
-20-user result for #31. Do not invent a second result or duplicate tool versions.
+| Operation, 20 users | Final run p95 | Expanded run p95 |
+|---|---:|---:|
+| List | 843.61 ms | 713.80 ms |
+| Search | 210.26 ms | 165.13 ms |
+| Combined filter | 621.17 ms | 477.11 ms |
+
+`evidence/load-final-windows-4407bd09d4.json` and `evidence/load-extra-windows-ec02c57c45.json` were recorded 2026-11-08. The expanded run also measured individual filters and another search: its slowest 20-user case was date-range filtering at 925.47 ms. All results in these files are below 1,000 ms p95, with zero recorded errors/timeouts/non-2xx. Different runs must not be combined into one sample.
+
+## Earlier Linux reference
+
+`evidence/load-followup-linux.json` records 20-user list/search/filter p95 of 381.50/79.15/234.18 ms; `evidence/load.json` records another earlier Linux run. The original documentation reports an earlier Windows list p95 of 2,319.49 ms, but its raw JSON is not included in this docs archive. A short recorded pass does not negate that historical report or guarantee performance on another machine.

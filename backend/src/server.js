@@ -1,13 +1,29 @@
 import "dotenv/config";
 import app from "./app.js";
-
 import { startReminderScheduler } from "./sprint2/reminders.js";
-const stopReminders = startReminderScheduler();
-process.once("SIGTERM", stopReminders);
-process.once("SIGINT", stopReminders);
+import { pathToFileURL } from "node:url";
 
-const port = process.env.PORT || 5000;
+export function startServer({
+  application = app,
+  startScheduler = startReminderScheduler,
+  env = process.env,
+  processApi = process,
+  logger = console,
+} = {}) {
+  const stopReminders = startScheduler();
+  processApi.once("SIGTERM", stopReminders);
+  processApi.once("SIGINT", stopReminders);
 
-app.listen(port, () => {
-  console.log(`TaskFlow API listening on port ${port}`);
-});
+  const port = env.PORT || 5000;
+  return application.listen(port, () => {
+    logger.log(`TaskFlow API listening on port ${port}`);
+  });
+}
+
+export function runServerIfMain(entryPath = process.argv[1], start = startServer) {
+  if (entryPath && import.meta.url === pathToFileURL(entryPath).href) {
+    start();
+  }
+}
+
+runServerIfMain();

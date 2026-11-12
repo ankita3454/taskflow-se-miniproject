@@ -31,7 +31,7 @@ const invitationSelect = {
   invitedBy: { select: { id: true, name: true, email: true } },
 };
 
-export async function createInvitation(projectId, inviterId, body) {
+export async function createInvitation(projectId, inviterId, body, db = prisma) {
   const fields = asObject(body);
   const unknown = Object.keys(fields).filter((key) => key !== "email");
   if (unknown.length > 0) {
@@ -40,7 +40,7 @@ export async function createInvitation(projectId, inviterId, body) {
   assertValid({ email: validateEmail(fields.email) });
   const invitedEmail = normaliseEmail(fields.email);
 
-  const existingMember = await prisma.projectMember.findFirst({
+  const existingMember = await db.projectMember.findFirst({
     where: { projectId, user: { email: invitedEmail } },
     select: { userId: true },
   });
@@ -49,7 +49,7 @@ export async function createInvitation(projectId, inviterId, body) {
   }
 
   try {
-    return await prisma.projectInvitation.create({
+    return await db.projectInvitation.create({
       data: { projectId, invitedById: inviterId, invitedEmail },
       select: invitationSelect,
     });
@@ -61,8 +61,8 @@ export async function createInvitation(projectId, inviterId, body) {
   }
 }
 
-export async function getReceivedInvitations(userId) {
-  const user = await prisma.user.findUnique({
+export async function getReceivedInvitations(userId, db = prisma) {
+  const user = await db.user.findUnique({
     where: { id: userId },
     select: { email: true },
   });
@@ -70,19 +70,19 @@ export async function getReceivedInvitations(userId) {
     throw new InvitationError(404, "NOT_FOUND", "User not found");
   }
 
-  return prisma.projectInvitation.findMany({
+  return db.projectInvitation.findMany({
     where: { invitedEmail: normaliseEmail(user.email), status: "PENDING" },
     orderBy: { createdAt: "desc" },
     select: invitationSelect,
   });
 }
 
-export async function respondToInvitation(invitationId, userId, response) {
+export async function respondToInvitation(invitationId, userId, response, db = prisma) {
   if (!isUuid(invitationId)) {
     throw new InvitationError(404, "NOT_FOUND", "Invitation not found");
   }
 
-  return prisma.$transaction(async (tx) => {
+  return db.$transaction(async (tx) => {
     const [user, invitation] = await Promise.all([
       tx.user.findUnique({ where: { id: userId }, select: { email: true } }),
       tx.projectInvitation.findUnique({

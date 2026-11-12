@@ -1,30 +1,17 @@
-# In-app notifications (#20 and #21)
+# TaskFlow Notifications
 
-## Integrated events
-- Owner assignment/reassignment creates one notification for the new assignee, unless the Owner assigns the task to themselves.
-- Repeating an unchanged assignment creates neither a new notification nor a new activity entry.
-- Creating a task with an initial assignee also creates an assignment notification, except self-assignment.
-- Same-key task-creation retries reuse the task and do not create another notification.
-- An actual allowed status change by the assignee notifies the canonical Project.ownerId. A status change by that Project Owner notifies the current assignee only while they remain in the project.
-- No assignment/status notification is sent to its actor. If Owner and assignee are the same person, status changes create no notification. The authenticated actor ID is passed explicitly from task workflows.
-- Recipient routing is the team-selected behaviour clarification; it does not change who is authorized to change status or the allowed transitions.
-- Unassigned tasks have no notification recipient. A removed assignee does not receive a new project notification; the Owner's legitimate status update still succeeds.
-- Task changes, corresponding activity records and event notifications share one transaction. Notification-write failures roll back the successful-event changes.
+## Events and recipients
 
-## Recipient access
-All notification APIs require a valid JWT. Listing, counts, single-read and mark-all-read are scoped to the authenticated recipient. A foreign recipient's ID returns the same 404 as an unknown ID on single-read.
+The existing implementation and project decisions describe in-app notices for assignment or reassignment, permitted status changes, comments mentioning project members, and eligible due-date reminders. Unchanged assignments and same-key task-creation retries do not create duplicate assignment notices. Actors do not receive notifications for their own assignment or status action; inaccessible, removed or inactive members are excluded where applicable. Mention handling resolves active project members and deduplicates recipients for one comment.
 
-## Same-session updates
-The bell polls the authenticated list every five seconds, without reloading the page. This is polling, not WebSocket/SSE push: new-event visibility normally takes up to the next poll plus request latency. Counts are derived from that same returned list. Read actions update the UI after server success; stale in-flight polls cannot undo a newer read state. Read state is persisted in PostgreSQL.
+Notification access is scoped to the authenticated recipient. The supplied original documentation describes a notification bell that polls every five seconds rather than using push; the frontend code was not supplied for this review. Read state is stored, and assignment/status changes and corresponding in-app events are documented as transactional.
 
-## Tests
-Backend: `npm test` runs all node:test suites plus the Jest notification suites. The runner deliberately separates the frameworks and discovers future core test files instead of dropping them from CI.
-Frontend: `npm test`, `npm run lint`, `npm run build`.
-The workflow suite exercises real task HTTP endpoints, assignment/status/activity transactions, recipient isolation, task-creation retry prevention and rollback fault injection.
-The bell suite covers polling, single/all read, remount persistence, 401 handling, refresh failure recovery, stale response protection and unmount cleanup.
+## Reminders
 
-## Remaining Sprint 2 work
-Comment-mention notification helpers are available, but actual comment/mention integration belongs to #19. It must be tested with the real comment workflow when that feature is implemented. Due-date email reminders belong to #22; neither SMTP nor reminder scheduling is implemented by this PR.
+The reminder worker uses due-minus-three-day and due-minus-one-day UTC windows. Done or unassigned tasks and inaccessible/inactive assignees are excluded. The claim is unique per task and interval for the task's lifetime, including after due-date or assignee changes. SMTP transport is restricted to a configured Mailtrap sandbox and requires local credentials, which must not be included in reports.
 
-## Verification boundary
-The combined candidate was tested locally on isolated PostgreSQL and in a local headless browser. The target branch's CI and the user's Docker deployment must be checked after applying the packages; local results are not proof that the remote branch already contains these changes.
+Database claims and SMTP cannot be committed atomically: an ambiguous send may remain UNKNOWN and is not automatically repeated. A stored claim prevents repeated automatic submission but does not prove the recipient received exactly one email. Missing a whole UTC window can also prevent delivery.
+
+## Evidence and boundaries
+
+Backend source includes notification, collaboration and reminder tests. `sprint2/evidence/mailtrap-windows-3b0650c609.json` records two successful sender returns, two skips on the second run, two in-app records and no Done-task reminders; its inbox-verification flag is false and the intervals are not identified. The original system report mentions later user confirmation without an inbox screenshot. See `sprint2/CHAITHANYA.md` for implementation and `part3/02-SYSTEM-VALIDATION-REPORT.md` for the evidence assessment.
